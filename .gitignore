@@ -30,3 +30,6 @@ coverage/
 # Task files
 tasks.json
 tasks/ 
+# IDE and tool directories
+.cursor/
+.taskmaster/
