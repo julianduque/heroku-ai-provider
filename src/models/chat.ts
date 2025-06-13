@@ -1,0 +1,1085 @@
+import {
+  APICallError,
+  LanguageModelV1Prompt,
+  LanguageModelV1,
+  LanguageModelV1CallOptions,
+  LanguageModelV1FunctionTool,
+  LanguageModelV1ProviderDefinedTool,
+  LanguageModelV1ToolChoice,
+  LanguageModelV1FunctionToolCall,
+  LanguageModelV1StreamPart,
+  LanguageModelV1FinishReason,
+} from "@ai-sdk/provider";
+import { makeHerokuRequest, processHerokuStream } from "../utils/api-client.js";
+import { createValidationError } from "../utils/error-handling.js";
+
+// Define more specific types for better type safety
+interface HerokuMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface HerokuTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+interface HerokuRequestBody extends Record<string, unknown> {
+  model: string;
+  messages: HerokuMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+  stop?: string[];
+  stream: boolean;
+  tools?: HerokuTool[];
+  tool_choice?: "auto" | "none" | { type: string; function: { name: string } };
+}
+
+// Tool result interface for handling tool role messages
+interface ToolResult {
+  type: "tool-result";
+  toolCallId: string;
+  toolName: string;
+  result: unknown;
+}
+
+// Interface for tool choice with type
+interface TypedToolChoice {
+  type: string;
+  toolName?: string;
+  function?: Record<string, unknown>;
+}
+
+// Interface for function tool structure
+interface FunctionTool {
+  type: "function";
+  function: Record<string, unknown>;
+}
+
+// Type aliases for compatibility
+export type ToolInput =
+  | LanguageModelV1FunctionTool
+  | LanguageModelV1ProviderDefinedTool;
+export type ToolChoiceInput = LanguageModelV1ToolChoice;
+
+export class HerokuChatLanguageModel implements LanguageModelV1 {
+  readonly specificationVersion = "v1" as const;
+  readonly provider = "heroku" as const;
+  readonly modelId: string;
+  readonly defaultObjectGenerationMode = "json" as const;
+
+  constructor(
+    private readonly model: string,
+    private readonly apiKey: string,
+    private readonly baseUrl: string,
+  ) {
+    // Comprehensive parameter validation
+    this.validateConstructorParameters(model, apiKey, baseUrl);
+    this.modelId = model;
+  }
+
+  /**
+   * Validate constructor parameters with detailed error messages
+   */
+  private validateConstructorParameters(
+    model: string,
+    apiKey: string,
+    baseUrl: string,
+  ): void {
+    // Validate model parameter
+    if (!model || typeof model !== "string") {
+      throw createValidationError(
+        "Model must be a non-empty string",
+        "model",
+        model,
+      );
+    }
+
+    if (model.trim().length === 0) {
+      throw createValidationError(
+        "Model cannot be empty or contain only whitespace",
+        "model",
+        model,
+      );
+    }
+
+    // Validate API key parameter
+    if (!apiKey || typeof apiKey !== "string") {
+      throw createValidationError(
+        "API key must be a non-empty string",
+        "apiKey",
+        "[REDACTED]",
+      );
+    }
+
+    if (apiKey.trim().length === 0) {
+      throw createValidationError(
+        "API key cannot be empty or contain only whitespace",
+        "apiKey",
+        "[REDACTED]",
+      );
+    }
+
+    // Basic API key format validation (should look like a token)
+    if (apiKey.length < 10) {
+      throw createValidationError(
+        "API key appears to be too short to be valid",
+        "apiKey",
+        "[REDACTED]",
+      );
+    }
+
+    // Validate base URL parameter
+    if (!baseUrl || typeof baseUrl !== "string") {
+      throw createValidationError(
+        "Base URL must be a non-empty string",
+        "baseUrl",
+        baseUrl,
+      );
+    }
+
+    if (baseUrl.trim().length === 0) {
+      throw createValidationError(
+        "Base URL cannot be empty or contain only whitespace",
+        "baseUrl",
+        baseUrl,
+      );
+    }
+
+    // Validate URL format
+    try {
+      const url = new URL(baseUrl);
+
+      // Ensure it's HTTP or HTTPS
+      if (!["http:", "https:"].includes(url.protocol)) {
+        throw createValidationError(
+          "Base URL must use HTTP or HTTPS protocol",
+          "baseUrl",
+          baseUrl,
+        );
+      }
+
+      // Ensure it has a valid hostname
+      if (!url.hostname || url.hostname.length === 0) {
+        throw createValidationError(
+          "Base URL must have a valid hostname",
+          "baseUrl",
+          baseUrl,
+        );
+      }
+    } catch (urlError) {
+      if (urlError instanceof Error && urlError.name === "TypeError") {
+        throw createValidationError(
+          `Base URL is not a valid URL format: ${urlError.message}`,
+          "baseUrl",
+          baseUrl,
+        );
+      }
+      // Re-throw validation errors as-is
+      throw urlError;
+    }
+
+    // Validate against Heroku's supported chat completion models
+    const supportedHerokuChatModels = [
+      "claude-3-5-sonnet-latest",
+      "claude-3-haiku",
+      "claude-4-sonnet",
+      "claude-3-7-sonnet",
+      "claude-3-5-haiku",
+    ];
+
+    if (!supportedHerokuChatModels.includes(model)) {
+      throw createValidationError(
+        `Unsupported chat model '${model}'. Supported models: ${supportedHerokuChatModels.join(", ")}`,
+        "model",
+        model,
+      );
+    }
+  }
+
+  async doGenerate(options: LanguageModelV1CallOptions) {
+    // Validate options
+    if (!options || !options.prompt) {
+      throw new APICallError({
+        message: "Missing required prompt in options",
+        url: "",
+        requestBodyValues: { options },
+      });
+    }
+
+    try {
+      // Map prompt to Heroku messages format
+      const messages = this.mapPromptToMessages(options.prompt);
+
+      // Build request body
+      const requestBody: HerokuRequestBody = {
+        model: this.model,
+        messages,
+        stream: false,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+        top_p: options.topP,
+        stop: options.stopSequences,
+      };
+
+      // Handle tools if provided
+      if (options.mode?.type === "regular" && options.mode.tools) {
+        // Validate tools is not empty array
+        if (
+          Array.isArray(options.mode.tools) &&
+          options.mode.tools.length === 0
+        ) {
+          throw new APICallError({
+            message: "Tools must be a non-empty array when provided",
+            url: "",
+            requestBodyValues: { tools: options.mode.tools },
+          });
+        }
+
+        requestBody.tools = this.mapToolsToHerokuFormat(options.mode.tools);
+        if (options.mode.toolChoice) {
+          requestBody.tool_choice = this.mapToolChoiceToHerokuFormat(
+            options.mode.toolChoice,
+            options.mode.tools,
+          );
+        }
+      } else if (options.mode?.type === "regular" && options.mode.toolChoice) {
+        // Warn if tool choice is provided without tools
+        console.warn(
+          "Tool choice provided without tools - ignoring tool choice",
+        );
+      }
+
+      // Make API request
+      const response = await makeHerokuRequest(
+        this.baseUrl,
+        this.apiKey,
+        requestBody,
+        {
+          maxRetries: 3,
+          timeout: 30000,
+        },
+      );
+
+      return this.mapResponseToOutput(
+        response as Record<string, unknown>,
+        options,
+      );
+    } catch (error) {
+      if (error instanceof APICallError) {
+        throw error;
+      }
+      throw new APICallError({
+        message: `Failed to generate completion: ${error instanceof Error ? error.message : String(error)}`,
+        url: this.baseUrl,
+        requestBodyValues: {},
+        cause: error,
+      });
+    }
+  }
+
+  async doStream(options: LanguageModelV1CallOptions) {
+    // Validate options
+    if (!options || !options.prompt) {
+      throw new APICallError({
+        message: "Missing required prompt in options",
+        url: "",
+        requestBodyValues: { options },
+      });
+    }
+
+    try {
+      // Map prompt to Heroku messages format
+      const messages = this.mapPromptToMessages(options.prompt);
+
+      // Build request body for streaming
+      const requestBody: HerokuRequestBody = {
+        model: this.model,
+        messages,
+        stream: true,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+        top_p: options.topP,
+        stop: options.stopSequences,
+      };
+
+      // Handle tools if provided
+      if (options.mode?.type === "regular" && options.mode.tools) {
+        // Validate tools is not empty array
+        if (
+          Array.isArray(options.mode.tools) &&
+          options.mode.tools.length === 0
+        ) {
+          throw new APICallError({
+            message: "Tools must be a non-empty array when provided",
+            url: "",
+            requestBodyValues: { tools: options.mode.tools },
+          });
+        }
+
+        requestBody.tools = this.mapToolsToHerokuFormat(options.mode.tools);
+        if (options.mode.toolChoice) {
+          requestBody.tool_choice = this.mapToolChoiceToHerokuFormat(
+            options.mode.toolChoice,
+            options.mode.tools,
+          );
+        }
+      } else if (options.mode?.type === "regular" && options.mode.toolChoice) {
+        // Warn if tool choice is provided without tools
+        console.warn(
+          "Tool choice provided without tools - ignoring tool choice",
+        );
+      }
+
+      // Make API request
+      const response = await makeHerokuRequest(
+        this.baseUrl,
+        this.apiKey,
+        requestBody,
+        {
+          maxRetries: 3,
+          timeout: 30000,
+          stream: true,
+        },
+      );
+
+      // Create streaming response
+      const rawStream = processHerokuStream(response as Response, this.baseUrl);
+
+      // Transform the stream to match AI SDK interface
+      const mapChunkToStreamPart = this.mapChunkToStreamPart.bind(this);
+      const stream = rawStream.pipeThrough(
+        new TransformStream<unknown, LanguageModelV1StreamPart>({
+          transform(chunk, controller) {
+            const streamPart = mapChunkToStreamPart(
+              chunk as Record<string, unknown>,
+            );
+            if (streamPart) {
+              controller.enqueue(streamPart);
+            }
+          },
+        }),
+      );
+
+      return {
+        stream,
+        rawCall: {
+          rawPrompt: options.prompt as unknown,
+          rawSettings: requestBody as Record<string, unknown>,
+        },
+        rawResponse: {
+          headers: {},
+        },
+      };
+    } catch (error) {
+      if (error instanceof APICallError) {
+        throw error;
+      }
+      throw new APICallError({
+        message: `Failed to stream completion: ${error instanceof Error ? error.message : String(error)}`,
+        url: this.baseUrl,
+        requestBodyValues: {},
+        cause: error,
+      });
+    }
+  }
+
+  private mapPromptToMessages(prompt: LanguageModelV1Prompt): HerokuMessage[] {
+    const messages: HerokuMessage[] = [];
+
+    // Handle string prompt (convert to user message)
+    if (typeof prompt === "string") {
+      messages.push({
+        role: "user",
+        content: prompt,
+      });
+      return messages;
+    }
+
+    // Handle array of messages
+    if (Array.isArray(prompt)) {
+      for (const item of prompt) {
+        const convertedMessage = this.convertMessageToHerokuFormat(item);
+        messages.push(convertedMessage);
+      }
+      return messages;
+    }
+
+    throw createValidationError(
+      "Prompt must be a string or array of messages",
+      "prompt",
+      prompt,
+    );
+  }
+
+  private convertMessageToHerokuFormat(item: unknown): HerokuMessage {
+    // Validate that item is an object
+    if (!item || typeof item !== "object") {
+      throw createValidationError(
+        "Prompt item must be an object",
+        "promptItem",
+        item,
+      );
+    }
+
+    const messageItem = item as Record<string, unknown>;
+
+    // Validate role
+    if (!messageItem.role || typeof messageItem.role !== "string") {
+      throw createValidationError(
+        "Message role must be a string",
+        "role",
+        messageItem.role,
+      );
+    }
+
+    const role = messageItem.role as string;
+
+    // Validate role values
+    if (!["system", "user", "assistant", "tool"].includes(role)) {
+      throw new APICallError({
+        message: `Invalid message role: ${role}`,
+        url: "",
+        requestBodyValues: { role },
+      });
+    }
+
+    // Handle content based on message type
+    let content = "";
+
+    if (role === "system") {
+      if (typeof messageItem.content === "string") {
+        content = messageItem.content;
+      } else {
+        throw createValidationError(
+          "System message content must be a string",
+          "content",
+          messageItem.content,
+        );
+      }
+    } else if (role === "user") {
+      if (typeof messageItem.content === "string") {
+        content = messageItem.content;
+      } else if (Array.isArray(messageItem.content)) {
+        // Handle array content (text + images)
+        const textParts: string[] = [];
+        for (const part of messageItem.content) {
+          if (
+            part &&
+            typeof part === "object" &&
+            "type" in part &&
+            part.type === "text" &&
+            "text" in part &&
+            typeof part.text === "string"
+          ) {
+            textParts.push(part.text);
+          }
+        }
+        content = textParts.join("\n");
+      } else if (
+        messageItem.content &&
+        typeof messageItem.content === "object" &&
+        "text" in messageItem.content &&
+        typeof messageItem.content.text === "string"
+      ) {
+        // Handle object content with text property
+        content = messageItem.content.text;
+      } else {
+        throw createValidationError(
+          "User message content must be a string, array, or object with text property",
+          "content",
+          messageItem.content,
+        );
+      }
+
+      // Validate content is not empty or whitespace-only
+      if (!content || content.trim() === "") {
+        throw new APICallError({
+          message: "Message content cannot be empty",
+          url: "",
+          requestBodyValues: { content },
+        });
+      }
+    } else if (role === "assistant") {
+      if (typeof messageItem.content === "string") {
+        content = messageItem.content;
+      } else if (Array.isArray(messageItem.content)) {
+        // Handle array content for assistant messages
+        const textParts: string[] = [];
+        for (const part of messageItem.content) {
+          if (
+            part &&
+            typeof part === "object" &&
+            "type" in part &&
+            part.type === "text" &&
+            "text" in part &&
+            typeof part.text === "string"
+          ) {
+            textParts.push(part.text);
+          }
+        }
+        content = textParts.join("\n");
+      } else {
+        throw createValidationError(
+          "Assistant message content must be a string or array",
+          "content",
+          messageItem.content,
+        );
+      }
+    } else if (role === "tool") {
+      // Handle tool result messages from the AI SDK
+      if (Array.isArray(messageItem.content)) {
+        const toolResults: string[] = [];
+        for (const part of messageItem.content) {
+          if (
+            part &&
+            typeof part === "object" &&
+            "type" in part &&
+            part.type === "tool-result"
+          ) {
+            const toolResult = part as ToolResult;
+            const toolName = toolResult.toolName || "unknown_tool";
+            const result = toolResult.result;
+
+            // Format tool result as text that the model can understand
+            let resultText = "";
+            if (typeof result === "string") {
+              resultText = result;
+            } else if (typeof result === "object") {
+              resultText = JSON.stringify(result, null, 2);
+            } else {
+              resultText = String(result);
+            }
+
+            toolResults.push(`Tool "${toolName}" returned: ${resultText}`);
+          }
+        }
+        content = toolResults.join("\n\n");
+      } else {
+        throw createValidationError(
+          "Tool message content must be an array of tool results",
+          "content",
+          messageItem.content,
+        );
+      }
+    }
+
+    // Convert tool messages to user messages since Heroku API may not support tool role
+    const finalRole = role === "tool" ? "user" : role;
+
+    return {
+      role: finalRole as "system" | "user" | "assistant",
+      content,
+    };
+  }
+
+  private mapToolsToHerokuFormat(tools: ToolInput[]): HerokuTool[] {
+    if (!Array.isArray(tools)) {
+      throw createValidationError("Tools must be an array", "tools", tools);
+    }
+
+    return tools.map((tool, index) => {
+      // Validate tool is an object
+      if (!tool || typeof tool !== "object") {
+        throw new APICallError({
+          message: `Tool at index ${index}: Invalid tool format`,
+          url: "",
+          requestBodyValues: { [`tools[${index}]`]: tool },
+        });
+      }
+
+      let name = "";
+      let description = "";
+      let parameters: Record<string, unknown> = {};
+
+      // Handle nested function format (OpenAI-style)
+      if ("type" in tool && tool.type === "function" && "function" in tool) {
+        const func = tool.function;
+
+        if (!func || typeof func !== "object") {
+          throw new APICallError({
+            message: `Tool at index ${index}: Invalid function object structure`,
+            url: "",
+            requestBodyValues: { [`tools[${index}]`]: tool },
+          });
+        }
+
+        const funcObj = func as Record<string, unknown>;
+        name = (funcObj.name as string) || "";
+        description = (funcObj.description as string) || "";
+        parameters = (funcObj.parameters as Record<string, unknown>) || {};
+      }
+      // Handle flat tool format
+      else if ("name" in tool) {
+        name = (tool.name as string) || "";
+        description =
+          "description" in tool && typeof tool.description === "string"
+            ? tool.description
+            : "";
+        parameters =
+          "parameters" in tool && tool.parameters
+            ? (tool.parameters as Record<string, unknown>)
+            : {};
+      } else {
+        throw new APICallError({
+          message: `Tool at index ${index}: Invalid tool format. Expected object with 'name' and 'description' properties or nested function object`,
+          url: "",
+          requestBodyValues: { [`tools[${index}]`]: tool },
+        });
+      }
+
+      // Validate name
+      if (!name || name.trim() === "") {
+        throw new APICallError({
+          message: `Tool at index ${index}: Tool must have a non-empty name`,
+          url: "",
+          requestBodyValues: { [`tools[${index}]`]: tool },
+        });
+      }
+
+      // Validate description
+      if (!description || description.trim() === "") {
+        throw new APICallError({
+          message: `Tool at index ${index}: Tool must have a non-empty description`,
+          url: "",
+          requestBodyValues: { [`tools[${index}]`]: tool },
+        });
+      }
+
+      // Validate tool name format (basic function name validation)
+      const trimmedName = name.trim();
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedName)) {
+        throw new APICallError({
+          message: `Tool name '${trimmedName}' is invalid. Must be a valid function name (letters, numbers, underscores only, cannot start with number)`,
+          url: "",
+          requestBodyValues: { [`tools[${index}]`]: tool },
+        });
+      }
+
+      // Remove $schema property that zod adds, as Heroku API doesn't accept it
+      const cleanParameters = { ...parameters };
+      if (cleanParameters.$schema) {
+        delete cleanParameters.$schema;
+      }
+
+      return {
+        type: "function" as const,
+        function: {
+          name: trimmedName,
+          description: description.trim(),
+          parameters: cleanParameters,
+        },
+      };
+    });
+  }
+
+  private mapToolChoiceToHerokuFormat(
+    toolChoice: LanguageModelV1ToolChoice,
+    availableTools?: ToolInput[],
+  ): "auto" | "none" | { type: string; function: { name: string } } {
+    if (!toolChoice) {
+      return "auto";
+    }
+
+    // Handle string values
+    if (typeof toolChoice === "string") {
+      if (toolChoice === "auto" || toolChoice === "none") {
+        return toolChoice;
+      }
+      if (toolChoice === "required") {
+        return "auto"; // Heroku might not support "required", fallback to "auto"
+      }
+
+      // Validate tool name format
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(toolChoice)) {
+        throw new APICallError({
+          message: `Invalid tool name in tool choice: '${toolChoice}'`,
+          url: "",
+          requestBodyValues: { toolChoice },
+        });
+      }
+
+      // Validate tool exists
+      if (availableTools) {
+        const toolExists = availableTools.some((tool) => {
+          if ("name" in tool) {
+            return tool.name === toolChoice;
+          }
+          if (
+            "type" in tool &&
+            (tool as FunctionTool).type === "function" &&
+            "function" in tool
+          ) {
+            const func = (tool as FunctionTool).function;
+            return func.name === toolChoice;
+          }
+          return false;
+        });
+
+        if (!toolExists) {
+          throw new APICallError({
+            message: `Tool choice references non-existent tool: '${toolChoice}'`,
+            url: "",
+            requestBodyValues: { toolChoice },
+          });
+        }
+      }
+
+      return {
+        type: "function",
+        function: { name: toolChoice },
+      };
+    }
+
+    // Handle object format
+    if (typeof toolChoice === "object") {
+      if ("type" in toolChoice) {
+        const typedToolChoice = toolChoice as TypedToolChoice;
+
+        if (typedToolChoice.type === "auto") {
+          return "auto";
+        }
+        if (typedToolChoice.type === "none") {
+          return "none";
+        }
+        if (typedToolChoice.type === "required") {
+          return "auto"; // Heroku might not support "required", fallback to "auto"
+        }
+        if (typedToolChoice.type === "tool" && "toolName" in typedToolChoice) {
+          const toolName = typedToolChoice.toolName as string;
+
+          if (!toolName || toolName.trim() === "") {
+            throw new APICallError({
+              message: "Tool choice must have a toolName",
+              url: "",
+              requestBodyValues: { toolChoice },
+            });
+          }
+
+          // Validate tool exists
+          if (availableTools) {
+            const toolExists = availableTools.some((tool) => {
+              if ("name" in tool) {
+                return tool.name === toolName;
+              }
+              if (
+                "type" in tool &&
+                (tool as FunctionTool).type === "function" &&
+                "function" in tool
+              ) {
+                const func = (tool as FunctionTool).function;
+                return func.name === toolName;
+              }
+              return false;
+            });
+
+            if (!toolExists) {
+              throw new APICallError({
+                message: `Tool choice references non-existent tool: '${toolName}'`,
+                url: "",
+                requestBodyValues: { toolChoice },
+              });
+            }
+          }
+
+          return {
+            type: "function",
+            function: { name: toolName },
+          };
+        }
+
+        if (typedToolChoice.type !== "function") {
+          throw new APICallError({
+            message: `Unsupported tool choice type: '${typedToolChoice.type}'`,
+            url: "",
+            requestBodyValues: { toolChoice },
+          });
+        }
+
+        if ("function" in toolChoice) {
+          const func = typedToolChoice.function as Record<string, unknown>;
+          const toolName = func.name as string;
+
+          if (!toolName || toolName.trim() === "") {
+            throw new APICallError({
+              message: "Tool choice function must have a name",
+              url: "",
+              requestBodyValues: { toolChoice },
+            });
+          }
+
+          // Validate tool exists
+          if (availableTools) {
+            const toolExists = availableTools.some((tool) => {
+              if ("name" in tool) {
+                return tool.name === toolName;
+              }
+              if (
+                "type" in tool &&
+                (tool as FunctionTool).type === "function" &&
+                "function" in tool
+              ) {
+                const toolFunc = (tool as FunctionTool).function;
+                return toolFunc.name === toolName;
+              }
+              return false;
+            });
+
+            if (!toolExists) {
+              throw new APICallError({
+                message: `Tool choice references non-existent tool: '${toolName}'`,
+                url: "",
+                requestBodyValues: { toolChoice },
+              });
+            }
+          }
+
+          return {
+            type: "function",
+            function: { name: toolName },
+          };
+        }
+      }
+
+      // Handle shorthand format
+      if ("function" in toolChoice) {
+        const func = (toolChoice as TypedToolChoice).function as Record<
+          string,
+          unknown
+        >;
+        const toolName = func.name as string;
+
+        if (!toolName || toolName.trim() === "") {
+          throw new APICallError({
+            message: "Tool choice function must have a name",
+            url: "",
+            requestBodyValues: { toolChoice },
+          });
+        }
+
+        return {
+          type: "function",
+          function: { name: toolName },
+        };
+      }
+    }
+
+    // Invalid format
+    throw new APICallError({
+      message: "Invalid tool choice format",
+      url: "",
+      requestBodyValues: { toolChoice },
+    });
+  }
+
+  private mapResponseToOutput(
+    response: Record<string, unknown>,
+    _options: LanguageModelV1CallOptions,
+  ) {
+    // Validate response structure
+    if (!response || typeof response !== "object") {
+      throw new APICallError({
+        message: "Invalid response format from Heroku API",
+        url: this.baseUrl,
+        requestBodyValues: {},
+        cause: response,
+      });
+    }
+
+    // Extract choices
+    const choices = response.choices as unknown[];
+    if (!Array.isArray(choices) || choices.length === 0) {
+      throw new APICallError({
+        message: "No choices in response from Heroku API",
+        url: this.baseUrl,
+        requestBodyValues: {},
+        cause: response,
+      });
+    }
+
+    const choice = choices[0] as Record<string, unknown>;
+    const message = choice.message as Record<string, unknown>;
+
+    // Extract text content
+    const text = (message?.content as string) || "";
+
+    // Extract tool calls
+    const toolCalls = this.extractToolCalls(message);
+
+    // Map tool calls to LanguageModelV1FunctionToolCall format
+    const mappedToolCalls: LanguageModelV1FunctionToolCall[] | undefined =
+      toolCalls?.map((call) => ({
+        toolCallType: "function" as const,
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        args: JSON.stringify(call.args), // Convert to JSON string as expected by AI SDK
+      }));
+
+    // Extract usage information
+    const usage = (response.usage as Record<string, unknown>) || {};
+    const promptTokens = (usage.prompt_tokens as number) || 0;
+    const completionTokens = (usage.completion_tokens as number) || 0;
+
+    // Extract finish reason
+    const finishReason =
+      (choice.finish_reason as LanguageModelV1FinishReason) || "stop";
+
+    return {
+      text,
+      toolCalls: mappedToolCalls,
+      finishReason,
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+      },
+      rawCall: {
+        rawPrompt: null,
+        rawSettings: {},
+      },
+      rawResponse: {
+        headers: (response.headers as Record<string, string>) || {},
+      },
+    };
+  }
+
+  private mapChunkToStreamPart(
+    chunk: Record<string, unknown>,
+  ): LanguageModelV1StreamPart | null {
+    if (!chunk || typeof chunk !== "object") {
+      return null;
+    }
+
+    const choices = chunk.choices as unknown[];
+    if (!Array.isArray(choices) || choices.length === 0) {
+      return null;
+    }
+
+    const choice = choices[0] as Record<string, unknown>;
+    const delta = choice.delta as Record<string, unknown>;
+
+    if (!delta) {
+      return null;
+    }
+
+    // Handle text delta
+    if (delta.content && typeof delta.content === "string") {
+      return {
+        type: "text-delta",
+        textDelta: delta.content,
+      };
+    }
+
+    // Handle tool calls (simplified for now)
+    if (delta.tool_calls) {
+      // Return a simple finish part for tool calls
+      return {
+        type: "finish",
+        finishReason: "tool-calls",
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+        },
+      };
+    }
+
+    return null;
+  }
+
+  private extractToolCalls(message: Record<string, unknown> | undefined) {
+    if (!message || !message.tool_calls) {
+      return undefined;
+    }
+
+    const toolCalls = message.tool_calls as unknown[];
+    if (!Array.isArray(toolCalls)) {
+      console.warn(
+        "Invalid tool_calls format: expected array, got",
+        typeof message.tool_calls,
+      );
+      return undefined;
+    }
+
+    const validToolCalls: Array<{
+      toolCallId: string;
+      toolCallType: "function";
+      toolName: string;
+      args: Record<string, unknown>;
+    }> = [];
+
+    toolCalls.forEach((call: unknown, index: number) => {
+      // Validate tool call is an object
+      if (!call || typeof call !== "object") {
+        console.warn(
+          `Tool call at index ${index}: Invalid format, expected object, got`,
+          typeof call,
+        );
+        return;
+      }
+
+      const toolCall = call as Record<string, unknown>;
+      const func = toolCall.function as Record<string, unknown>;
+
+      let args = {};
+      if (func?.arguments) {
+        try {
+          if (typeof func.arguments === "string") {
+            args = func.arguments.trim() ? JSON.parse(func.arguments) : {};
+          } else if (
+            typeof func.arguments === "object" &&
+            func.arguments !== null
+          ) {
+            args = func.arguments as Record<string, unknown>;
+          }
+        } catch (error) {
+          console.warn(
+            `Tool call at index ${index}: Failed to parse function arguments as JSON:`,
+            func.arguments,
+            "Error:",
+            error instanceof Error ? error.message : String(error),
+          );
+          args = {};
+        }
+      }
+
+      const toolCallId = (toolCall.id as string) || "";
+      const toolName = (func?.name as string) || "";
+
+      // Warn about missing ID
+      if (!toolCall.id || typeof toolCall.id !== "string") {
+        console.warn(
+          `Tool call at index ${index}: Missing or invalid ID, expected string, got`,
+          typeof toolCall.id,
+        );
+      }
+
+      // Warn about missing function object
+      if (!func || typeof func !== "object") {
+        console.warn(
+          `Tool call at index ${index}: Missing or invalid function object, expected object, got`,
+          typeof func,
+        );
+      }
+
+      // Only filter out tool calls with BOTH no ID AND no name
+      if (!toolCallId && !toolName) {
+        console.warn("Filtering out invalid tool call with no ID or name");
+        return;
+      }
+
+      validToolCalls.push({
+        toolCallId,
+        toolCallType: "function" as const,
+        toolName,
+        args,
+      });
+    });
+
+    return validToolCalls;
+  }
+}

@@ -1,0 +1,16 @@
+src/
+tests/
+scripts/
+.github/
+tsconfig*.json
+jest.config.*
+eslint.config.mjs
+.env*
+*.log
+.DS_Store
+node_modules/
+coverage/
+.nyc_output/
+*.tgz
+.vscode/
+.idea/ 
