@@ -1,0 +1,71 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "name": "Heroku AI SDK Provider",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "hideGenerator": false,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Document",
+    "Project",
+    "Module",
+    "Namespace",
+    "Enum",
+    "EnumMember",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Constructor",
+    "Property",
+    "Variable",
+    "Function",
+    "Accessor",
+    "Method",
+    "Parameter",
+    "TypeParameter",
+    "TypeLiteral",
+    "CallSignature",
+    "ConstructorSignature",
+    "IndexSignature",
+    "GetSignature",
+    "SetSignature"
+  ],
+  "categorizeByGroup": true,
+  "defaultCategory": "Other",
+  "categoryOrder": [
+    "Provider",
+    "Models",
+    "Utilities",
+    "Error Handling",
+    "Types",
+    "*"
+  ],
+  "searchInComments": true,
+  "searchInDocuments": true,
+  "cleanOutputDir": true,
+  "titleLink": "https://github.com/julianduque/heroku-ai-provider",
+  "navigationLinks": {
+    "GitHub": "https://github.com/julianduque/heroku-ai-provider",
+    "NPM": "https://www.npmjs.com/package/heroku-ai-provider",
+    "Heroku AI": "https://devcenter.heroku.com/categories/ai"
+  },
+  "sidebarLinks": {
+    "GitHub": "https://github.com/julianduque/heroku-ai-provider",
+    "Report Issue": "https://github.com/julianduque/heroku-ai-provider/issues"
+  },
+
+  "theme": "default",
+  "lightHighlightTheme": "light-plus",
+  "darkHighlightTheme": "dark-plus",
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "treatWarningsAsErrors": false
+}

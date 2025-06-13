@@ -1,5 +1,5 @@
 import { streamText } from "ai";
-import { createHerokuProvider } from "../dist/esm/index.js";
+import { createHerokuProvider } from "../src/index";
 
 async function streamingChatExample() {
   // Create the Heroku provider

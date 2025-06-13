@@ -12,6 +12,9 @@ node_modules/
 # Environment variables
 .env
 
+# Test coverage
+coverage/
+
 # Editor directories and files
 .idea
 .vscode

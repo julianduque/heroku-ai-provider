@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { createHerokuProvider } from "../dist/esm/index.js";
+import { createHerokuProvider } from "../src/index";
 
 async function basicChatExample() {
   // Create the Heroku provider

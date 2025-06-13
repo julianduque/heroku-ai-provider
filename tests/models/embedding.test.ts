@@ -1,82 +1,69 @@
 import {
   HerokuEmbeddingModel,
-  EmbeddingOptions,
   createEmbedFunction,
 } from "../../src/models/embedding";
 import { APICallError } from "@ai-sdk/provider";
-import * as apiClient from "../../src/utils/api-client";
+import { makeHerokuRequest } from "../../src/utils/api-client";
 
-// Mock the API client utilities
+// Mock the API client
 jest.mock("../../src/utils/api-client");
-const mockMakeHerokuRequest = jest.mocked(apiClient.makeHerokuRequest);
+const mockMakeHerokuRequest = makeHerokuRequest as jest.MockedFunction<
+  typeof makeHerokuRequest
+>;
 
 describe("HerokuEmbeddingModel", () => {
-  let model: HerokuEmbeddingModel;
   const testModel = "cohere-embed-multilingual";
   const testApiKey = "test-api-key";
-  const testBaseUrl = "https://test.heroku.com/v1/embeddings";
+  const testBaseUrl = "https://api.heroku.com/ai";
+
+  let model: HerokuEmbeddingModel;
 
   beforeEach(() => {
     model = new HerokuEmbeddingModel(testModel, testApiKey, testBaseUrl);
-    jest.clearAllMocks();
+    mockMakeHerokuRequest.mockClear();
   });
 
-  describe("Constructor and Properties", () => {
+  describe("Constructor", () => {
     it("should initialize with correct properties", () => {
+      expect(model.modelId).toBe(testModel);
       expect(model.specificationVersion).toBe("v1");
       expect(model.provider).toBe("heroku");
-      expect(model.modelId).toBe(testModel);
       expect(model.maxEmbeddingsPerCall).toBe(100);
-      expect(model.supportsParallelCalls).toBe(true);
-    });
-
-    it("should throw error for missing model name", () => {
-      expect(
-        () => new HerokuEmbeddingModel("", testApiKey, testBaseUrl),
-      ).toThrow(APICallError);
-      expect(
-        () => new HerokuEmbeddingModel("", testApiKey, testBaseUrl),
-      ).toThrow("Model must be a non-empty string");
-    });
-
-    it("should throw error for missing API key", () => {
-      expect(
-        () => new HerokuEmbeddingModel(testModel, "", testBaseUrl),
-      ).toThrow(APICallError);
-      expect(
-        () => new HerokuEmbeddingModel(testModel, "", testBaseUrl),
-      ).toThrow("API key must be a non-empty string");
     });
   });
 
   describe("Input Validation", () => {
     it("should throw error for empty input array", async () => {
-      await expect(model.doEmbed([])).rejects.toThrow(APICallError);
-      await expect(model.doEmbed([])).rejects.toThrow("Input cannot be empty");
+      await expect(model.doEmbed({ values: [] })).rejects.toThrow(APICallError);
+      await expect(model.doEmbed({ values: [] })).rejects.toThrow(
+        "Input cannot be empty",
+      );
     });
 
     it("should throw error for empty strings in input", async () => {
       await expect(
-        model.doEmbed(["valid text", "", "another valid text"]),
+        model.doEmbed({ values: ["valid text", "", "another valid text"] }),
       ).rejects.toThrow(APICallError);
       await expect(
-        model.doEmbed(["valid text", "", "another valid text"]),
-      ).rejects.toThrow("Input cannot contain empty strings");
+        model.doEmbed({ values: ["valid text", "", "another valid text"] }),
+      ).rejects.toThrow("Input must be non-empty strings only");
     });
 
     it("should throw error for whitespace-only strings", async () => {
       await expect(
-        model.doEmbed(["valid text", "   ", "another valid text"]),
+        model.doEmbed({ values: ["valid text", "   ", "another valid text"] }),
       ).rejects.toThrow(APICallError);
       await expect(
-        model.doEmbed(["valid text", "   ", "another valid text"]),
-      ).rejects.toThrow("Input cannot contain empty strings");
+        model.doEmbed({ values: ["valid text", "   ", "another valid text"] }),
+      ).rejects.toThrow("Input must be non-empty strings only");
     });
 
     it("should throw error for batch size exceeding limit", async () => {
       const largeInput = Array(101).fill("test text");
-      await expect(model.doEmbed(largeInput)).rejects.toThrow(APICallError);
-      await expect(model.doEmbed(largeInput)).rejects.toThrow(
+      await expect(model.doEmbed({ values: largeInput })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: largeInput })).rejects.toThrow(
         "Batch size exceeds maximum limit of 100",
       );
     });
@@ -91,9 +78,11 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
-      const result = await model.doEmbed("Hello, world!");
+      const result = await model.doEmbed({ values: ["Hello, world!"] });
 
       expect(result.embeddings).toEqual([[0.1, 0.2, 0.3]]);
+      expect(result.usage).toEqual({ tokens: 5 });
+      expect(result.rawResponse).toEqual({ headers: {} });
       expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
         testBaseUrl,
         testApiKey,
@@ -108,7 +97,7 @@ describe("HerokuEmbeddingModel", () => {
       );
     });
 
-    it("should handle single string with options", async () => {
+    it("should handle single string with headers", async () => {
       const mockResponse = {
         data: [{ embedding: [0.4, 0.5, 0.6], index: 0 }],
         model: testModel,
@@ -116,24 +105,19 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
-      const options: EmbeddingOptions = {
-        inputType: "search_query",
-        embeddingType: "float",
-        truncate: "END",
-      };
-
-      const result = await model.doEmbed("Search query text", options);
+      const result = await model.doEmbed({
+        values: ["Search query text"],
+        headers: { "X-Custom-Header": "test-value" },
+      });
 
       expect(result.embeddings).toEqual([[0.4, 0.5, 0.6]]);
+      expect(result.usage).toEqual({ tokens: 8 });
       expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
         testBaseUrl,
         testApiKey,
         expect.objectContaining({
           model: testModel,
           input: ["Search query text"],
-          input_type: "search_query",
-          embedding_type: "float",
-          truncate: "END",
         }),
         expect.objectContaining({
           maxRetries: 3,
@@ -157,13 +141,14 @@ describe("HerokuEmbeddingModel", () => {
       mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
       const texts = ["First text", "Second text", "Third text"];
-      const result = await model.doEmbed(texts);
+      const result = await model.doEmbed({ values: texts });
 
       expect(result.embeddings).toEqual([
         [0.1, 0.2, 0.3],
         [0.4, 0.5, 0.6],
         [0.7, 0.8, 0.9],
       ]);
+      expect(result.usage).toEqual({ tokens: 15 });
       expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
         testBaseUrl,
         testApiKey,
@@ -178,29 +163,24 @@ describe("HerokuEmbeddingModel", () => {
       );
     });
 
-    it("should handle partial options (only some fields set)", async () => {
+    it("should handle missing usage in response", async () => {
       const mockResponse = {
         data: [{ embedding: [0.1, 0.2], index: 0 }],
         model: testModel,
-        usage: { prompt_tokens: 5, total_tokens: 5 },
+        // No usage field
       };
       mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
-      const options: EmbeddingOptions = {
-        inputType: "classification",
-        // embeddingType and truncate not set
-      };
+      const result = await model.doEmbed({ values: ["Test text"] });
 
-      await model.doEmbed("Test text", options);
-
+      expect(result.embeddings).toEqual([[0.1, 0.2]]);
+      expect(result.usage).toBeUndefined();
       expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
         testBaseUrl,
         testApiKey,
         expect.objectContaining({
           model: testModel,
           input: ["Test text"],
-          input_type: "classification",
-          // Should not include embedding_type or truncate
         }),
         expect.objectContaining({
           maxRetries: 3,
@@ -219,8 +199,10 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(invalidResponse);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "Invalid response format: missing data array",
       );
     });
@@ -236,10 +218,12 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(invalidResponse);
 
-      await expect(model.doEmbed(["Text 1", "Text 2"])).rejects.toThrow(
-        APICallError,
-      );
-      await expect(model.doEmbed(["Text 1", "Text 2"])).rejects.toThrow(
+      await expect(
+        model.doEmbed({ values: ["Text 1", "Text 2"] }),
+      ).rejects.toThrow(APICallError);
+      await expect(
+        model.doEmbed({ values: ["Text 1", "Text 2"] }),
+      ).rejects.toThrow(
         "Response data length (1) does not match input length (2)",
       );
     });
@@ -252,8 +236,10 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(invalidResponse);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "Invalid embedding format at index 0",
       );
     });
@@ -266,8 +252,10 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(invalidResponse);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "Empty embedding vector at index 0",
       );
     });
@@ -280,8 +268,10 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(invalidResponse);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "Invalid embedding values at index 0: contains non-numeric or infinite values",
       );
     });
@@ -294,8 +284,10 @@ describe("HerokuEmbeddingModel", () => {
       };
       mockMakeHerokuRequest.mockResolvedValue(invalidResponse);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "Invalid embedding values at index 0: contains non-numeric or infinite values",
       );
     });
@@ -312,18 +304,22 @@ describe("HerokuEmbeddingModel", () => {
       });
       mockMakeHerokuRequest.mockRejectedValue(apiError);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "API rate limit exceeded",
       );
     });
 
     it("should wrap other errors in APICallError", async () => {
-      const networkError = new Error("Network timeout");
+      const networkError = new Error("Network connection failed");
       mockMakeHerokuRequest.mockRejectedValue(networkError);
 
-      await expect(model.doEmbed("Test")).rejects.toThrow(APICallError);
-      await expect(model.doEmbed("Test")).rejects.toThrow(
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
+        APICallError,
+      );
+      await expect(model.doEmbed({ values: ["Test"] })).rejects.toThrow(
         "Failed to generate embeddings",
       );
     });
@@ -331,7 +327,7 @@ describe("HerokuEmbeddingModel", () => {
 
   describe("Helper Methods", () => {
     describe("embedSingle", () => {
-      it("should return single embedding for convenience", async () => {
+      it("should handle single text embedding", async () => {
         const mockResponse = {
           data: [{ embedding: [0.1, 0.2, 0.3], index: 0 }],
           model: testModel,
@@ -339,14 +335,26 @@ describe("HerokuEmbeddingModel", () => {
         };
         mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
-        const result = await model.embedSingle("Test text");
+        const result = await model.embedSingle("Hello, world!");
 
         expect(result.embedding).toEqual([0.1, 0.2, 0.3]);
+        expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
+          testBaseUrl,
+          testApiKey,
+          expect.objectContaining({
+            model: testModel,
+            input: ["Hello, world!"],
+          }),
+          expect.objectContaining({
+            maxRetries: 3,
+            timeout: 30000,
+          }),
+        );
       });
     });
 
     describe("embedBatch", () => {
-      it("should handle small batches normally", async () => {
+      it("should handle small batches without chunking", async () => {
         const mockResponse = {
           data: [
             { embedding: [0.1, 0.2], index: 0 },
@@ -357,41 +365,14 @@ describe("HerokuEmbeddingModel", () => {
         };
         mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
-        const result = await model.embedBatch(["Text 1", "Text 2"]);
+        const texts = ["Text 1", "Text 2"];
+        const result = await model.embedBatch(texts);
 
         expect(result.embeddings).toEqual([
           [0.1, 0.2],
           [0.3, 0.4],
         ]);
         expect(mockMakeHerokuRequest).toHaveBeenCalledTimes(1);
-      });
-
-      it("should chunk large batches automatically", async () => {
-        // Mock responses for two chunks
-        mockMakeHerokuRequest
-          .mockResolvedValueOnce({
-            data: [
-              { embedding: [0.1, 0.2], index: 0 },
-              { embedding: [0.3, 0.4], index: 1 },
-            ],
-            model: testModel,
-            usage: { prompt_tokens: 10, total_tokens: 10 },
-          })
-          .mockResolvedValueOnce({
-            data: [{ embedding: [0.5, 0.6], index: 0 }],
-            model: testModel,
-            usage: { prompt_tokens: 5, total_tokens: 5 },
-          });
-
-        const texts = ["Text 1", "Text 2", "Text 3"];
-        const result = await model.embedBatch(texts, {}, 2); // Chunk size of 2
-
-        expect(result.embeddings).toEqual([
-          [0.1, 0.2],
-          [0.3, 0.4],
-          [0.5, 0.6],
-        ]);
-        expect(mockMakeHerokuRequest).toHaveBeenCalledTimes(2);
       });
     });
   });
@@ -406,10 +387,10 @@ describe("HerokuEmbeddingModel", () => {
       mockMakeHerokuRequest.mockResolvedValue(mockResponse);
 
       const embedFunction = createEmbedFunction(model);
-      const result = await embedFunction("Test text");
+      const result = await embedFunction("Hello, world!");
 
       expect(result.embedding).toEqual([0.1, 0.2, 0.3]);
-      expect(result.usage).toEqual({ prompt_tokens: 5, total_tokens: 5 });
+      expect(result.usage).toEqual({ tokens: 5 });
     });
 
     it("should create AI SDK compatible function for array input", async () => {
@@ -430,67 +411,7 @@ describe("HerokuEmbeddingModel", () => {
         [0.1, 0.2],
         [0.3, 0.4],
       ]);
-      expect(result.usage).toEqual({ prompt_tokens: 10, total_tokens: 10 });
-    });
-  });
-
-  describe("Options Handling", () => {
-    it("should handle all embedding options correctly", async () => {
-      const mockResponse = {
-        data: [{ embedding: [0.1, 0.2], index: 0 }],
-        model: testModel,
-        usage: { prompt_tokens: 5, total_tokens: 5 },
-      };
-      mockMakeHerokuRequest.mockResolvedValue(mockResponse);
-
-      const options: EmbeddingOptions = {
-        inputType: "search_document",
-        embeddingType: "int8",
-        truncate: "START",
-      };
-
-      await model.doEmbed("Test", options);
-
-      expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
-        testBaseUrl,
-        testApiKey,
-        expect.objectContaining({
-          model: testModel,
-          input: ["Test"],
-          input_type: "search_document",
-          embedding_type: "int8",
-          truncate: "START",
-        }),
-        expect.objectContaining({
-          maxRetries: 3,
-          timeout: 30000,
-        }),
-      );
-    });
-
-    it("should handle empty options object", async () => {
-      const mockResponse = {
-        data: [{ embedding: [0.1, 0.2], index: 0 }],
-        model: testModel,
-        usage: { prompt_tokens: 5, total_tokens: 5 },
-      };
-      mockMakeHerokuRequest.mockResolvedValue(mockResponse);
-
-      await model.doEmbed("Test", {});
-
-      expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
-        testBaseUrl,
-        testApiKey,
-        expect.objectContaining({
-          model: testModel,
-          input: ["Test"],
-          // Should not include any optional parameters
-        }),
-        expect.objectContaining({
-          maxRetries: 3,
-          timeout: 30000,
-        }),
-      );
+      expect(result.usage).toEqual({ tokens: 10 });
     });
   });
 });

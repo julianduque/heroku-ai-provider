@@ -1,11 +1,10 @@
 import { embed, embedMany } from "ai";
-import {
-  createHerokuProvider,
-  createEmbedFunction,
-} from "../dist/esm/index.js";
+import { createHerokuProvider, createEmbedFunction } from "../src/index";
 
 async function basicEmbeddingsExample() {
-  const heroku = createHerokuProvider();
+  const heroku = createHerokuProvider({
+    embeddingsApiKey: process.env.HEROKU_EMBEDDING_KEY,
+  });
 
   try {
     console.log("🧠 Starting basic embeddings example...\n");
@@ -68,10 +67,9 @@ async function convenienceFunctionExample() {
     console.log("\n🚀 Convenience function example...\n");
 
     // Create a reusable embed function
-    const embedText = createEmbedFunction({
-      apiKey: process.env.HEROKU_EMBEDDING_KEY!,
-      model: "cohere-embed-multilingual",
-    });
+    const heroku = createHerokuProvider();
+    const embeddingModel = heroku.embedding("cohere-embed-multilingual");
+    const embedText = createEmbedFunction(embeddingModel);
 
     // Use the convenience function
     const documents = [
@@ -83,7 +81,7 @@ async function convenienceFunctionExample() {
     console.log("Using convenience function:");
     for (const doc of documents) {
       const embedding = await embedText(doc);
-      console.log(`- "${doc}": ${embedding.length} dimensions`);
+      console.log(`- "${doc}": ${embedding.embedding?.length} dimensions`);
     }
   } catch (error) {
     console.error("Error in convenience function example:", error);

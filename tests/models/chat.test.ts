@@ -1633,11 +1633,12 @@ describe("HerokuChatLanguageModel", () => {
         usage: {
           promptTokens: 10,
           completionTokens: 5,
-          totalTokens: 15,
         },
         finishReason: "stop",
-        rawCall: { rawPrompt: null, rawSettings: {} },
+        rawCall: { rawPrompt: "Test", rawSettings: {} },
         rawResponse: { headers: { "x-request-id": "req_123" } },
+        request: { body: "{}" },
+        warnings: [],
       });
     });
 
@@ -1654,7 +1655,6 @@ describe("HerokuChatLanguageModel", () => {
       expect(result.usage).toEqual({
         promptTokens: 0,
         completionTokens: 0,
-        totalTokens: 0,
       });
       expect(result.finishReason).toBe("stop");
     });

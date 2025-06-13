@@ -1,5 +1,5 @@
 import { generateText, tool } from "ai";
-import { createHerokuProvider } from "../dist/esm/index.js";
+import { createHerokuProvider } from "../src/index";
 import { z } from "zod";
 
 async function debugToolUsage() {

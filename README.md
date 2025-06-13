@@ -1,4 +1,4 @@
-# Heroku AI Provider
+# Heroku AI SDK Provider
 
 A TypeScript provider for the [Vercel AI SDK](https://sdk.vercel.ai/) that enables you to use Heroku's AI inference capabilities in your applications. This provider supports both chat completions and embeddings through Heroku's AI infrastructure.
 
@@ -47,8 +47,8 @@ HEROKU_INFERENCE_KEY=your_inference_api_key
 HEROKU_EMBEDDING_KEY=your_embedding_api_key
 
 # Optional: Custom API endpoints
-HEROKU_INFERENCE_URL=https://your-custom-inference-endpoint.com
-HEROKU_EMBEDDING_URL=https://your-custom-embedding-endpoint.com
+HEROKU_INFERENCE_URL=https://us.inference.heroku.com
+HEROKU_EMBEDDING_URL=https://us.inference.heroku.com
 ```
 
 ### Basic Configuration
@@ -149,7 +149,63 @@ const { text } = await generateText({
       },
     }),
   },
+  maxSteps: 5, // Allow multi-step tool conversations
 });
+```
+
+#### Advanced Tool Usage with Multiple Steps
+
+```typescript
+import { generateText, tool } from "ai";
+import { createHerokuProvider } from "heroku-ai-provider";
+import { z } from "zod";
+
+const heroku = createHerokuProvider();
+
+const { text, steps } = await generateText({
+  model: heroku.chat("claude-3-5-sonnet-latest"),
+  prompt:
+    "Check the weather in New York and then suggest appropriate clothing.",
+  tools: {
+    getWeather: tool({
+      description: "Get the current weather for a location",
+      parameters: z.object({
+        location: z.string().describe("The city and state"),
+      }),
+      execute: async ({ location }) => {
+        return {
+          location,
+          temperature: 45,
+          condition: "rainy",
+          humidity: 80,
+        };
+      },
+    }),
+    suggestClothing: tool({
+      description: "Suggest appropriate clothing based on weather conditions",
+      parameters: z.object({
+        temperature: z.number().describe("Temperature in Fahrenheit"),
+        condition: z.string().describe("Weather condition"),
+        humidity: z.number().optional().describe("Humidity percentage"),
+      }),
+      execute: async ({ temperature, condition, humidity }) => {
+        return {
+          suggestions: [
+            "Waterproof jacket",
+            "Warm layers",
+            "Waterproof shoes",
+            "Umbrella",
+          ],
+          reasoning: `Given ${temperature}°F and ${condition} weather${humidity ? ` with ${humidity}% humidity` : ""}, you'll want to stay warm and dry.`,
+        };
+      },
+    }),
+  },
+  maxSteps: 5,
+});
+
+console.log("Final response:", text);
+console.log("Tool execution steps:", steps.length);
 ```
 
 ### Embeddings
@@ -248,6 +304,47 @@ export async function POST(req: Request) {
   const result = await streamText({
     model: heroku.chat("claude-3-5-sonnet-latest"),
     messages,
+    maxSteps: 5, // Enable multi-step tool conversations
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+### Next.js with Tool Support
+
+```typescript
+// app/api/chat/route.ts
+import { streamText, tool } from "ai";
+import { createHerokuProvider } from "heroku-ai-provider";
+import { z } from "zod";
+
+const heroku = createHerokuProvider();
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = await streamText({
+    model: heroku.chat("claude-3-5-sonnet-latest"),
+    messages,
+    tools: {
+      getTime: tool({
+        description: "Get the current time",
+        parameters: z.object({
+          timezone: z
+            .string()
+            .optional()
+            .describe("Timezone (e.g., 'America/New_York')"),
+        }),
+        execute: async ({ timezone = "UTC" }) => {
+          return {
+            time: new Date().toLocaleString("en-US", { timeZone: timezone }),
+            timezone,
+          };
+        },
+      }),
+    },
+    maxSteps: 5,
   });
 
   return result.toDataStreamResponse();
@@ -330,13 +427,15 @@ try {
 - **Issue**: "Invalid URL format" errors
 - **Solution**: Ensure custom URLs are valid and use HTTP/HTTPS protocol
 
-### Debug Mode
+#### Tool Execution Issues
 
-Enable debug logging by setting the environment variable:
+- **Issue**: Tools are called but AI doesn't provide final response
+- **Solution**: Ensure you're using `maxSteps: 5` or higher to allow multi-step tool conversations
 
-```bash
-DEBUG=heroku-ai-provider:*
-```
+#### Schema Validation Errors
+
+- **Issue**: "Unrecognized request argument" errors when using tools
+- **Solution**: This provider automatically filters out problematic schema properties (like `$schema`) that some validation libraries add
 
 ## Contributing
 
@@ -355,7 +454,7 @@ We welcome contributions! Please follow these steps:
 
 ```bash
 # Clone the repository
-git clone https://github.com/heroku/heroku-ai-provider.git
+git clone https://github.com/julianduque/heroku-ai-provider.git
 cd heroku-ai-provider
 
 # Install dependencies
@@ -394,7 +493,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENS
 
 - 📧 Email: [support@heroku.com](mailto:support@heroku.com)
 - 📖 Documentation: [Heroku AI Documentation](https://devcenter.heroku.com/categories/ai)
-- 🐛 Issues: [GitHub Issues](https://github.com/heroku/heroku-ai-provider/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/julianduque/heroku-ai-provider/issues)
 - 💬 Community: [Heroku Discord](https://discord.gg/heroku)
 
 ## Related Projects
