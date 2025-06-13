@@ -13,7 +13,7 @@ const error_handling_js_1 = require('../utils/error-handling.cjs');
  * AI SDK features.
  *
  * @class HerokuChatLanguageModel
- * @implements {LanguageModelV1}
+ * Implements the LanguageModelV1 interface from @ai-sdk/provider.
  *
  * @example
  * Basic usage with AI SDK:

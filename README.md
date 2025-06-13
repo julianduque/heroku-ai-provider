@@ -489,12 +489,10 @@ pnpm test --coverage
 
 This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Resources
 
-- 📧 Email: [support@heroku.com](mailto:support@heroku.com)
 - 📖 Documentation: [Heroku AI Documentation](https://devcenter.heroku.com/categories/ai)
 - 🐛 Issues: [GitHub Issues](https://github.com/julianduque/heroku-ai-provider/issues)
-- 💬 Community: [Heroku Discord](https://discord.gg/heroku)
 
 ## Related Projects
 

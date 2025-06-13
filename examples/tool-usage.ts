@@ -1,6 +1,7 @@
 import { generateText, tool } from "ai";
 import { createHerokuProvider } from "../src/index";
 import { z } from "zod";
+import "dotenv/config";
 
 // Mock functions for demonstration
 async function getCurrentWeather(location: string) {
@@ -181,7 +182,9 @@ async function toolUsageExample() {
 
 // Advanced tool example with complex data structures
 async function advancedToolExample() {
-  const heroku = createHerokuProvider();
+  const heroku = createHerokuProvider({
+    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
+  });
 
   try {
     console.log("\n🚀 Advanced tool usage example...\n");
@@ -190,6 +193,7 @@ async function advancedToolExample() {
       model: heroku.chat("claude-3-5-sonnet-latest"),
       prompt:
         'Help me manage my tasks. Add a new task called "Write documentation" with high priority, then list all my tasks.',
+      maxSteps: 5, // Allow multiple steps for tool execution + final response
       tools: {
         addTask: tool({
           description: "Add a new task to the task list",
@@ -268,6 +272,7 @@ async function advancedToolExample() {
     });
 
     console.log("Advanced Tool Result:", result.text);
+    console.log("\n✅ Advanced tool usage example completed successfully!\n");
   } catch (error) {
     console.error("Error in advanced tool example:", error);
   }

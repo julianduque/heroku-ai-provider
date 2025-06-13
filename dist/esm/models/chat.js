@@ -10,7 +10,7 @@ import { createValidationError } from "../utils/error-handling.js";
  * AI SDK features.
  *
  * @class HerokuChatLanguageModel
- * @implements {LanguageModelV1}
+ * Implements the LanguageModelV1 interface from @ai-sdk/provider.
  *
  * @example
  * Basic usage with AI SDK:

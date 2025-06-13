@@ -245,8 +245,8 @@ class HerokuEmbeddingModel {
             model: this.model,
             input: inputArray,
         };
-        // Note: Custom embedding options (inputType, embeddingType, truncate) 
-        // are not supported in the AI SDK interface. They would need to be 
+        // Note: Custom embedding options (inputType, embeddingType, truncate)
+        // are not supported in the AI SDK interface. They would need to be
         // passed through provider-specific options if needed.
         try {
             // Make API request with enhanced error handling
@@ -310,7 +310,9 @@ class HerokuEmbeddingModel {
             }
             return {
                 embeddings,
-                usage: response.usage ? { tokens: response.usage.total_tokens } : undefined,
+                usage: response.usage
+                    ? { tokens: response.usage.total_tokens }
+                    : undefined,
                 rawResponse: {
                     headers: {},
                 },
