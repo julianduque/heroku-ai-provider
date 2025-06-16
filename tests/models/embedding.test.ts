@@ -82,7 +82,6 @@ describe("HerokuEmbeddingModel", () => {
 
       expect(result.embeddings).toEqual([[0.1, 0.2, 0.3]]);
       expect(result.usage).toEqual({ tokens: 5 });
-      expect(result.rawResponse).toEqual({ headers: {} });
       expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
         testBaseUrl,
         testApiKey,

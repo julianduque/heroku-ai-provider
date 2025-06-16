@@ -313,9 +313,6 @@ class HerokuEmbeddingModel {
                 usage: response.usage
                     ? { tokens: response.usage.total_tokens }
                     : undefined,
-                rawResponse: {
-                    headers: {},
-                },
             };
         }
         catch (error) {

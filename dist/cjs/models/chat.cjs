@@ -475,13 +475,6 @@ class HerokuChatLanguageModel {
                     rawPrompt: options.prompt,
                     rawSettings: requestBody,
                 },
-                rawResponse: {
-                    headers: {},
-                },
-                request: {
-                    body: JSON.stringify(requestBody),
-                },
-                warnings: [],
             };
         }
         catch (error) {
@@ -951,13 +944,6 @@ class HerokuChatLanguageModel {
                 rawPrompt: _options.prompt,
                 rawSettings: {},
             },
-            rawResponse: {
-                headers: response.headers || {},
-            },
-            request: {
-                body: JSON.stringify({}),
-            },
-            warnings: [],
         };
     }
     mapChunkToStreamPart(chunk) {

@@ -1636,9 +1636,6 @@ describe("HerokuChatLanguageModel", () => {
         },
         finishReason: "stop",
         rawCall: { rawPrompt: "Test", rawSettings: {} },
-        rawResponse: { headers: { "x-request-id": "req_123" } },
-        request: { body: "{}" },
-        warnings: [],
       });
     });
 
@@ -1733,7 +1730,6 @@ describe("HerokuChatLanguageModel", () => {
 
       expect(result.stream).toBeDefined();
       expect(result.rawCall).toBeDefined();
-      expect(result.rawResponse).toBeDefined();
     });
 
     it("should handle tool call streaming", async () => {

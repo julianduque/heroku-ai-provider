@@ -644,13 +644,6 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
           rawPrompt: options.prompt as unknown,
           rawSettings: requestBody as Record<string, unknown>,
         },
-        rawResponse: {
-          headers: {},
-        },
-        request: {
-          body: JSON.stringify(requestBody),
-        },
-        warnings: [],
       };
     } catch (error) {
       if (error instanceof APICallError) {
@@ -1217,13 +1210,6 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
         rawPrompt: _options.prompt as unknown,
         rawSettings: {},
       },
-      rawResponse: {
-        headers: (response.headers as Record<string, string>) || {},
-      },
-      request: {
-        body: JSON.stringify({}),
-      },
-      warnings: [],
     };
   }
 

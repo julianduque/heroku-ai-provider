@@ -195,13 +195,6 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
             rawPrompt: unknown;
             rawSettings: {};
         };
-        rawResponse: {
-            headers: Record<string, string>;
-        };
-        request: {
-            body: string;
-        };
-        warnings: never[];
     }>;
     /**
      * Generate a streaming chat completion using the Heroku AI API.
@@ -307,18 +300,11 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
      * ```
      */
     doStream(options: LanguageModelV1CallOptions): Promise<{
-        stream: import("stream/web").ReadableStream<LanguageModelV1StreamPart>;
+        stream: ReadableStream<LanguageModelV1StreamPart>;
         rawCall: {
             rawPrompt: unknown;
             rawSettings: Record<string, unknown>;
         };
-        rawResponse: {
-            headers: {};
-        };
-        request: {
-            body: string;
-        };
-        warnings: never[];
     }>;
     private mapPromptToMessages;
     private convertMessageToHerokuFormat;
