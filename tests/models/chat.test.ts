@@ -1742,6 +1742,7 @@ describe("HerokuChatLanguageModel", () => {
               delta: {
                 tool_calls: [
                   {
+                    index: 0,
                     id: "call_123",
                     function: { name: "get_weather" },
                   },
@@ -1756,6 +1757,7 @@ describe("HerokuChatLanguageModel", () => {
               delta: {
                 tool_calls: [
                   {
+                    index: 0,
                     id: "call_123",
                     function: { arguments: '{"location":' },
                   },
@@ -1770,11 +1772,19 @@ describe("HerokuChatLanguageModel", () => {
               delta: {
                 tool_calls: [
                   {
+                    index: 0,
                     id: "call_123",
                     function: { arguments: '"New York"}' },
                   },
                 ],
               },
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              finish_reason: "tool_calls",
             },
           ],
         },
