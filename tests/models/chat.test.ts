@@ -721,7 +721,7 @@ describe("HerokuChatLanguageModel", () => {
         "Tool call at index 0: Failed to parse function arguments as JSON:",
         "invalid json",
         "Error:",
-        "Unexpected token 'i', \"invalid json\" is not valid JSON",
+        "JSON parsing failed: Text: invalid json.\nError message: Unexpected token 'i', \"invalid json\" is not valid JSON",
       );
 
       consoleSpy.mockRestore();
@@ -1331,7 +1331,9 @@ describe("HerokuChatLanguageModel", () => {
           expect.stringContaining("Failed to parse function arguments as JSON"),
           '{"invalid": json}',
           "Error:",
-          expect.any(String),
+          expect.stringContaining(
+            'JSON parsing failed: Text: {"invalid": json}',
+          ),
         );
 
         consoleSpy.mockRestore();

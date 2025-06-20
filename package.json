@@ -51,7 +51,8 @@
   ],
   "packageManager": "pnpm@10.12.1",
   "dependencies": {
-    "@ai-sdk/provider": "^1.1.3"
+    "@ai-sdk/provider": "^1.1.3",
+    "@ai-sdk/provider-utils": "^2.2.8"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

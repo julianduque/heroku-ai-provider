@@ -46,7 +46,6 @@ function processDirectory(directory) {
       // Rename .js files to .cjs
       const newFilePath = filePath.replace(/\.js$/, ".cjs");
       fs.renameSync(filePath, newFilePath);
-      console.log(`Renamed ${file} to ${path.basename(newFilePath)}`);
     }
   }
 }
@@ -68,7 +67,6 @@ function renameDeclarationFiles(directory) {
     } else if (file.endsWith(".d.ts")) {
       const newFilePath = filePath.replace(/\.d\.ts$/, ".d.cts");
       fs.renameSync(filePath, newFilePath);
-      console.log(`Renamed ${file} to ${path.basename(newFilePath)}`);
     }
   }
 }

@@ -84,12 +84,14 @@ export type ToolChoiceInput = LanguageModelV1ToolChoice;
  */
 export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     private readonly model;
-    private readonly apiKey;
-    private readonly baseUrl;
     readonly specificationVersion: "v1";
     readonly provider: "heroku";
     readonly modelId: string;
     readonly defaultObjectGenerationMode: "json";
+    private readonly apiKey;
+    private readonly baseUrl;
+    private streamingToolCalls;
+    private textBuffer;
     /**
      * Creates a new HerokuChatLanguageModel instance.
      *
@@ -305,6 +307,12 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
             rawPrompt: unknown;
             rawSettings: Record<string, unknown>;
         };
+        rawResponse: {
+            headers: {
+                [k: string]: string;
+            } | undefined;
+        };
+        warnings: never[];
     }>;
     private mapPromptToMessages;
     private convertMessageToHerokuFormat;
@@ -312,6 +320,11 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     private mapToolChoiceToHerokuFormat;
     private mapResponseToOutput;
     private mapChunkToStreamPart;
+    /**
+     * Helper method to check if a string is valid JSON using provider-utils
+     * @private
+     */
+    private isValidJson;
     private extractToolCalls;
 }
 //# sourceMappingURL=chat.d.ts.map
