@@ -183,6 +183,13 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
     }
   > = new Map();
 
+  // Track finish reason and usage separately for Heroku API
+  private streamingFinishReason: LanguageModelV1FinishReason | null = null;
+  private streamingUsage: {
+    promptTokens: number;
+    completionTokens: number;
+  } | null = null;
+
   /**
    * Constructor for the Heroku Chat Language Model.
    *
@@ -220,6 +227,16 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
     // Comprehensive parameter validation
     this.validateConstructorParameters(model, this.apiKey, this.baseUrl);
     this.modelId = model;
+  }
+
+  /**
+   * Reset streaming state to prevent pollution between requests
+   * @internal
+   */
+  private resetStreamingState(): void {
+    this.streamingToolCalls.clear();
+    this.streamingFinishReason = null;
+    this.streamingUsage = null;
   }
 
   /**
@@ -577,6 +594,9 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
    * ```
    */
   async doStream(options: LanguageModelV1CallOptions) {
+    // Reset streaming state for new request
+    this.resetStreamingState();
+
     // Validate options
     if (!options || !options.prompt) {
       throw new APICallError({
@@ -1299,9 +1319,36 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
     const choice = choices[0] as Record<string, unknown>;
     const delta = choice.delta as Record<string, unknown>;
 
+    // Handle usage information - Heroku may send usage info separately from finish reason
+    const usage = (chunk.usage as Record<string, unknown>) || {};
+    const promptTokens = (usage.prompt_tokens as number) || 0;
+    const completionTokens = (usage.completion_tokens as number) || 0;
+
+    // Store usage info if present and not zero
+    if (promptTokens > 0 || completionTokens > 0) {
+      this.streamingUsage = {
+        promptTokens,
+        completionTokens,
+      };
+    }
+
     // Handle finish reason
     const finishReason = choice.finish_reason as string;
-    if (finishReason) {
+    if (finishReason && finishReason.trim() !== "") {
+      // Store finish reason for later use
+      if (finishReason === "tool_calls" || finishReason === "function_call") {
+        this.streamingFinishReason = "tool-calls";
+      } else if (finishReason === "content_filter") {
+        this.streamingFinishReason = "content-filter";
+      } else if (finishReason === "max_tokens") {
+        this.streamingFinishReason = "length";
+      } else if (finishReason === "stop") {
+        this.streamingFinishReason = "stop";
+      } else {
+        this.streamingFinishReason = "other";
+      }
+
+      // Handle tool calls completion immediately
       if (finishReason === "tool_calls") {
         // Emit all completed tool calls when finish_reason is tool_calls
         const completedToolCalls: LanguageModelV1StreamPart[] = [];
@@ -1330,32 +1377,47 @@ export class HerokuChatLanguageModel implements LanguageModelV1 {
         }
       }
 
-      // Handle other finish reasons
-      const usage = (chunk.usage as Record<string, unknown>) || {};
-      const promptTokens = (usage.prompt_tokens as number) || 0;
-      const completionTokens = (usage.completion_tokens as number) || 0;
+      // For other finish reasons, check if we have accumulated usage info
+      // If we have both finish reason and usage, emit the finish event
+      if (this.streamingUsage || promptTokens > 0 || completionTokens > 0) {
+        const finalUsage = this.streamingUsage || {
+          promptTokens,
+          completionTokens,
+        };
 
-      // Normalize finish reason - map Heroku API finish reasons to AI SDK format
-      let normalizedFinishReason: LanguageModelV1FinishReason = "stop";
-      if (finishReason === "tool_calls" || finishReason === "function_call") {
-        normalizedFinishReason = "tool-calls";
-      } else if (finishReason === "content_filter") {
-        normalizedFinishReason = "content-filter";
-      } else if (finishReason === "max_tokens") {
-        normalizedFinishReason = "length";
-      } else if (finishReason === "stop") {
-        normalizedFinishReason = "stop";
-      } else {
-        normalizedFinishReason = "other";
+        // Reset state for next request
+        this.streamingUsage = null;
+        const finalFinishReason = this.streamingFinishReason || "stop";
+        this.streamingFinishReason = null;
+
+        return {
+          type: "finish",
+          finishReason: finalFinishReason,
+          usage: finalUsage,
+        };
       }
+    }
+
+    // If we have a finish reason but no usage yet, and this chunk has usage info
+    // (Heroku pattern: finish reason in one chunk, usage in another)
+    if (
+      this.streamingFinishReason &&
+      (promptTokens > 0 || completionTokens > 0)
+    ) {
+      const finalFinishReason = this.streamingFinishReason;
+      const finalUsage = this.streamingUsage || {
+        promptTokens,
+        completionTokens,
+      };
+
+      // Reset state for next request
+      this.streamingFinishReason = null;
+      this.streamingUsage = null;
 
       return {
         type: "finish",
-        finishReason: normalizedFinishReason,
-        usage: {
-          promptTokens,
-          completionTokens,
-        },
+        finishReason: finalFinishReason,
+        usage: finalUsage,
       };
     }
 

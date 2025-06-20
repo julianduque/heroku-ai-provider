@@ -91,6 +91,8 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     private readonly apiKey;
     private readonly baseUrl;
     private streamingToolCalls;
+    private streamingFinishReason;
+    private streamingUsage;
     /**
      * Constructor for the Heroku Chat Language Model.
      *
@@ -110,6 +112,11 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
      * ```
      */
     constructor(model: string, apiKey: string, baseUrl: string);
+    /**
+     * Reset streaming state to prevent pollution between requests
+     * @internal
+     */
+    private resetStreamingState;
     /**
      * Validate constructor parameters with detailed error messages
      * @internal

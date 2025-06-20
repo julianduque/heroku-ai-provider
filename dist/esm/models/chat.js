@@ -109,6 +109,9 @@ export class HerokuChatLanguageModel {
         this.defaultObjectGenerationMode = "json";
         // Streaming tool calls tracking
         this.streamingToolCalls = new Map();
+        // Track finish reason and usage separately for Heroku API
+        this.streamingFinishReason = null;
+        this.streamingUsage = null;
         // Load and validate API key using provider-utils
         this.apiKey = loadApiKey({
             apiKey,
@@ -121,6 +124,15 @@ export class HerokuChatLanguageModel {
         // Comprehensive parameter validation
         this.validateConstructorParameters(model, this.apiKey, this.baseUrl);
         this.modelId = model;
+    }
+    /**
+     * Reset streaming state to prevent pollution between requests
+     * @internal
+     */
+    resetStreamingState() {
+        this.streamingToolCalls.clear();
+        this.streamingFinishReason = null;
+        this.streamingUsage = null;
     }
     /**
      * Validate constructor parameters with detailed error messages
@@ -412,6 +424,8 @@ export class HerokuChatLanguageModel {
      * ```
      */
     async doStream(options) {
+        // Reset streaming state for new request
+        this.resetStreamingState();
         // Validate options
         if (!options || !options.prompt) {
             throw new APICallError({
@@ -1005,9 +1019,37 @@ export class HerokuChatLanguageModel {
         }
         const choice = choices[0];
         const delta = choice.delta;
+        // Handle usage information - Heroku may send usage info separately from finish reason
+        const usage = chunk.usage || {};
+        const promptTokens = usage.prompt_tokens || 0;
+        const completionTokens = usage.completion_tokens || 0;
+        // Store usage info if present and not zero
+        if (promptTokens > 0 || completionTokens > 0) {
+            this.streamingUsage = {
+                promptTokens,
+                completionTokens,
+            };
+        }
         // Handle finish reason
         const finishReason = choice.finish_reason;
-        if (finishReason) {
+        if (finishReason && finishReason.trim() !== "") {
+            // Store finish reason for later use
+            if (finishReason === "tool_calls" || finishReason === "function_call") {
+                this.streamingFinishReason = "tool-calls";
+            }
+            else if (finishReason === "content_filter") {
+                this.streamingFinishReason = "content-filter";
+            }
+            else if (finishReason === "max_tokens") {
+                this.streamingFinishReason = "length";
+            }
+            else if (finishReason === "stop") {
+                this.streamingFinishReason = "stop";
+            }
+            else {
+                this.streamingFinishReason = "other";
+            }
+            // Handle tool calls completion immediately
             if (finishReason === "tool_calls") {
                 // Emit all completed tool calls when finish_reason is tool_calls
                 const completedToolCalls = [];
@@ -1032,34 +1074,40 @@ export class HerokuChatLanguageModel {
                     return completedToolCalls[0];
                 }
             }
-            // Handle other finish reasons
-            const usage = chunk.usage || {};
-            const promptTokens = usage.prompt_tokens || 0;
-            const completionTokens = usage.completion_tokens || 0;
-            // Normalize finish reason - map Heroku API finish reasons to AI SDK format
-            let normalizedFinishReason = "stop";
-            if (finishReason === "tool_calls" || finishReason === "function_call") {
-                normalizedFinishReason = "tool-calls";
-            }
-            else if (finishReason === "content_filter") {
-                normalizedFinishReason = "content-filter";
-            }
-            else if (finishReason === "max_tokens") {
-                normalizedFinishReason = "length";
-            }
-            else if (finishReason === "stop") {
-                normalizedFinishReason = "stop";
-            }
-            else {
-                normalizedFinishReason = "other";
-            }
-            return {
-                type: "finish",
-                finishReason: normalizedFinishReason,
-                usage: {
+            // For other finish reasons, check if we have accumulated usage info
+            // If we have both finish reason and usage, emit the finish event
+            if (this.streamingUsage || promptTokens > 0 || completionTokens > 0) {
+                const finalUsage = this.streamingUsage || {
                     promptTokens,
                     completionTokens,
-                },
+                };
+                // Reset state for next request
+                this.streamingUsage = null;
+                const finalFinishReason = this.streamingFinishReason || "stop";
+                this.streamingFinishReason = null;
+                return {
+                    type: "finish",
+                    finishReason: finalFinishReason,
+                    usage: finalUsage,
+                };
+            }
+        }
+        // If we have a finish reason but no usage yet, and this chunk has usage info
+        // (Heroku pattern: finish reason in one chunk, usage in another)
+        if (this.streamingFinishReason &&
+            (promptTokens > 0 || completionTokens > 0)) {
+            const finalFinishReason = this.streamingFinishReason;
+            const finalUsage = this.streamingUsage || {
+                promptTokens,
+                completionTokens,
+            };
+            // Reset state for next request
+            this.streamingFinishReason = null;
+            this.streamingUsage = null;
+            return {
+                type: "finish",
+                finishReason: finalFinishReason,
+                usage: finalUsage,
             };
         }
         // Handle tool calls in delta
