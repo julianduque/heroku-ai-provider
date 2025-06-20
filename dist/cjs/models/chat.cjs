@@ -88,7 +88,7 @@ const error_handling_js_1 = require('../utils/error-handling.cjs');
  */
 class HerokuChatLanguageModel {
     /**
-     * Creates a new HerokuChatLanguageModel instance.
+     * Constructor for the Heroku Chat Language Model.
      *
      * @param model - The Heroku chat model identifier (e.g., "claude-3-5-sonnet-latest")
      * @param apiKey - Your Heroku AI API key for chat completions
@@ -110,10 +110,8 @@ class HerokuChatLanguageModel {
         this.specificationVersion = "v1";
         this.provider = "heroku";
         this.defaultObjectGenerationMode = "json";
-        // Track streaming tool call state
+        // Streaming tool calls tracking
         this.streamingToolCalls = new Map();
-        // Buffer for text content to detect tool calls
-        this.textBuffer = "";
         // Load and validate API key using provider-utils
         this.apiKey = (0, provider_utils_1.loadApiKey)({
             apiKey,
@@ -425,12 +423,10 @@ class HerokuChatLanguageModel {
                 requestBodyValues: { options },
             });
         }
-        // Clear the buffer at the start of a new stream
-        this.textBuffer = "";
         try {
-            // Clear streaming tool calls state for new stream
-            this.streamingToolCalls.clear();
-            // Handle tools if provided. Prioritize top-level tools definition.
+            // Map prompt to Heroku messages format
+            const messages = this.mapPromptToMessages(options.prompt);
+            // Handle tools if provided
             const extendedOptions = options;
             const tools = extendedOptions.tools ??
                 (options.mode?.type === "regular" ? options.mode.tools : undefined);
@@ -438,22 +434,6 @@ class HerokuChatLanguageModel {
                 (options.mode?.type === "regular"
                     ? options.mode.toolChoice
                     : undefined);
-            if (tools) {
-                // Validate tools is not empty array
-                if (Array.isArray(tools) && tools.length === 0) {
-                    throw new provider_1.APICallError({
-                        message: "Tools must be a non-empty array when provided",
-                        url: "",
-                        requestBodyValues: { tools },
-                    });
-                }
-            }
-            else if (toolChoice) {
-                // Warn if tool choice is provided without tools
-                console.warn("Tool choice provided without tools - ignoring tool choice");
-            }
-            // Map prompt to Heroku messages format, injecting tools into system prompt
-            const messages = this.mapPromptToMessages(options.prompt, tools);
             // Build request body for streaming
             const requestBody = {
                 model: this.model,
@@ -464,8 +444,26 @@ class HerokuChatLanguageModel {
                 top_p: options.topP,
                 stop: options.stopSequences,
             };
-            // Tools and tool_choice are now injected into the system prompt,
-            // so we no longer need to send them as separate parameters.
+            // Add tools to request body if provided
+            if (tools) {
+                // Validate tools is not empty array
+                if (Array.isArray(tools) && tools.length === 0) {
+                    throw new provider_1.APICallError({
+                        message: "Tools must be a non-empty array when provided",
+                        url: "",
+                        requestBodyValues: { tools },
+                    });
+                }
+                requestBody.tools = this.mapToolsToHerokuFormat(tools);
+                // Add tool choice if provided
+                if (toolChoice) {
+                    requestBody.tool_choice = this.mapToolChoiceToHerokuFormat(toolChoice, tools);
+                }
+            }
+            else if (toolChoice) {
+                // Warn if tool choice is provided without tools
+                console.warn("Tool choice provided without tools - ignoring tool choice");
+            }
             // Make API request
             const response = await (0, api_client_js_1.makeHerokuRequest)(this.baseUrl, this.apiKey, requestBody, {
                 maxRetries: 3,
@@ -510,7 +508,7 @@ class HerokuChatLanguageModel {
             });
         }
     }
-    mapPromptToMessages(prompt, tools) {
+    mapPromptToMessages(prompt) {
         const messages = [];
         let systemMessageContent = "";
         // The prompt from tests can be a string, so we need to handle it.
@@ -526,14 +524,7 @@ class HerokuChatLanguageModel {
                 systemMessageContent = systemMessage.content;
             }
         }
-        // Inject tool definitions into the system prompt if tools are provided
-        if (tools && tools.length > 0) {
-            const toolDefinitions = this.mapToolsToHerokuFormat(tools)
-                .map((tool) => `{"type": "function", "function": ${JSON.stringify(tool.function)}}`)
-                .join("\n");
-            systemMessageContent += `\n\nYou have access to the following tools. Use them when appropriate:\n${toolDefinitions}`;
-        }
-        // Add the (potentially modified) system message to the start
+        // Add the system message to the start if it exists
         if (systemMessageContent.trim() !== "") {
             messages.push({ role: "system", content: systemMessageContent.trim() });
         }
@@ -1017,217 +1008,53 @@ class HerokuChatLanguageModel {
         }
         const choice = choices[0];
         const delta = choice.delta;
-        if (!delta) {
-            // Handle finish reason when delta is not present
-            const finishReason = choice.finish_reason;
-            if (finishReason) {
-                // Extract usage from the chunk if available
-                const usage = chunk.usage || {};
-                const promptTokens = usage.prompt_tokens || 0;
-                const completionTokens = usage.completion_tokens || 0;
-                // Normalize finish reason - map Heroku API finish reasons to AI SDK format
-                let normalizedFinishReason = finishReason;
-                // Convert string to LanguageModelV1FinishReason
-                const finishReasonStr = String(finishReason);
-                if (finishReasonStr === "tool_calls" ||
-                    finishReasonStr === "function_call") {
-                    // AI SDK uses "tool-calls" with hyphen, not underscore
-                    normalizedFinishReason = "tool-calls";
-                }
-                else if (finishReasonStr === "content_filter") {
-                    normalizedFinishReason =
-                        "content-filter";
-                }
-                else if (finishReasonStr === "max_tokens") {
-                    normalizedFinishReason = "length";
-                }
-                else {
-                    // Default valid finish reasons: "stop", "length", "content-filter", "tool-calls", "error", "other"
-                    const validFinishReasons = [
-                        "stop",
-                        "length",
-                        "content-filter",
-                        "tool-calls",
-                        "error",
-                        "other",
-                    ];
-                    normalizedFinishReason = validFinishReasons.includes(finishReasonStr)
-                        ? finishReasonStr
-                        : "other";
-                }
-                return {
-                    type: "finish",
-                    finishReason: normalizedFinishReason,
-                    usage: {
-                        promptTokens,
-                        completionTokens,
-                    },
-                };
-            }
-            return null;
-        }
-        // Handle text delta
-        if (delta.content && typeof delta.content === "string") {
-            this.textBuffer += delta.content;
-            // Attempt to find a complete JSON object in the buffer
-            const jsonMatch = this.textBuffer.match(/{[\s\S]*}/);
-            if (jsonMatch) {
-                const potentialJson = jsonMatch[0];
-                const parsed = (0, provider_utils_1.safeParseJSON)({ text: potentialJson });
-                if (parsed.success) {
-                    const toolCallData = parsed.value;
-                    let toolName;
-                    let args;
-                    // Heuristic to identify if this is a tool call object
-                    if (toolCallData.function &&
-                        typeof toolCallData.function === "string") {
-                        toolName = toolCallData.function;
-                        args = JSON.stringify(toolCallData.arguments ?? {});
-                    }
-                    else if (Object.keys(toolCallData).length === 1) {
-                        toolName = Object.keys(toolCallData)[0];
-                        const potentialArgs = toolCallData[toolName];
-                        if (typeof potentialArgs === "object") {
-                            args = JSON.stringify(potentialArgs);
-                        }
-                    }
-                    if (toolName && args) {
-                        // It's a tool call, clear the buffer and return the tool call part
-                        this.textBuffer = "";
-                        return {
-                            type: "tool-call",
-                            toolCallType: "function",
-                            toolCallId: (0, provider_utils_1.generateId)(),
-                            toolName,
-                            args,
-                        };
-                    }
-                }
-            }
-            // If no valid tool call found yet, return the text delta
-            return {
-                type: "text-delta",
-                textDelta: delta.content,
-            };
-        }
-        // Handle tool calls in streaming
-        if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
-            const toolCallDeltas = delta.tool_calls;
-            // Process each tool call delta
-            for (const toolCallDelta of toolCallDeltas) {
-                if (!toolCallDelta || typeof toolCallDelta !== "object") {
-                    continue;
-                }
-                const toolCallId = toolCallDelta.id;
-                const functionDelta = toolCallDelta.function;
-                // Generate a stable ID if not provided using provider-utils
-                const stableId = toolCallId || (0, provider_utils_1.generateId)();
-                // Handle tool call start (when we get an ID and function name)
-                if (functionDelta?.name) {
-                    const toolName = functionDelta.name;
-                    const initialArgs = functionDelta.arguments || "";
-                    // Initialize or update the tool call in our tracking
-                    this.streamingToolCalls.set(stableId, {
-                        id: stableId,
-                        name: toolName,
-                        argsBuffer: initialArgs,
-                    });
-                    // If we have complete arguments already, try to parse and return complete tool call
-                    if (initialArgs && this.isValidJson(initialArgs)) {
-                        const parsedArgs = (0, provider_utils_1.safeParseJSON)({ text: initialArgs });
-                        if (parsedArgs.success) {
-                            // Clean up tracking since we have complete args
-                            this.streamingToolCalls.delete(stableId);
-                            return {
-                                type: "tool-call",
-                                toolCallType: "function",
-                                toolCallId: stableId,
-                                toolName: toolName,
-                                args: initialArgs,
-                            };
-                        }
-                    }
-                    // Return a tool call delta for streaming start
-                    return {
-                        type: "tool-call-delta",
-                        toolCallType: "function",
-                        toolCallId: stableId,
-                        toolName: toolName,
-                        argsTextDelta: initialArgs,
-                    };
-                }
-                // Handle tool call argument deltas
-                if (functionDelta?.arguments &&
-                    typeof functionDelta.arguments === "string") {
-                    const argsDelta = functionDelta.arguments;
-                    const existingCall = this.streamingToolCalls.get(stableId);
-                    if (existingCall) {
-                        // Append to existing args buffer
-                        existingCall.argsBuffer += argsDelta;
-                        // Check if we now have complete JSON
-                        if (this.isValidJson(existingCall.argsBuffer)) {
-                            const parsedArgs = (0, provider_utils_1.safeParseJSON)({
-                                text: existingCall.argsBuffer,
-                            });
-                            if (parsedArgs.success) {
-                                // Return complete tool call
-                                const result = {
-                                    type: "tool-call",
-                                    toolCallType: "function",
-                                    toolCallId: stableId,
-                                    toolName: existingCall.name,
-                                    args: existingCall.argsBuffer, // Keep as JSON string for AI SDK
-                                };
-                                // Clean up the tracking for this tool call
-                                this.streamingToolCalls.delete(stableId);
-                                return result;
-                            }
-                        }
-                    }
-                    // Return delta
-                    return {
-                        type: "tool-call-delta",
-                        toolCallType: "function",
-                        toolCallId: stableId,
-                        toolName: existingCall?.name || "",
-                        argsTextDelta: argsDelta,
-                    };
-                }
-            }
-        }
-        // Handle finish reason in delta
+        // Handle finish reason
         const finishReason = choice.finish_reason;
         if (finishReason) {
-            // Extract usage from the chunk if available
+            if (finishReason === "tool_calls") {
+                // Emit all completed tool calls when finish_reason is tool_calls
+                const completedToolCalls = [];
+                for (const [_index, toolCall] of this.streamingToolCalls.entries()) {
+                    if (toolCall.id && toolCall.name && toolCall.argsBuffer) {
+                        const parsedArgs = (0, provider_utils_1.safeParseJSON)({ text: toolCall.argsBuffer });
+                        if (parsedArgs.success) {
+                            completedToolCalls.push({
+                                type: "tool-call",
+                                toolCallType: "function",
+                                toolCallId: toolCall.id,
+                                toolName: toolCall.name,
+                                args: toolCall.argsBuffer, // Use raw JSON string for streaming
+                            });
+                        }
+                    }
+                }
+                // Clear the buffer after processing
+                this.streamingToolCalls.clear();
+                // Return the first tool call (limitation: we can only return one at a time)
+                if (completedToolCalls.length > 0) {
+                    return completedToolCalls[0];
+                }
+            }
+            // Handle other finish reasons
             const usage = chunk.usage || {};
             const promptTokens = usage.prompt_tokens || 0;
             const completionTokens = usage.completion_tokens || 0;
             // Normalize finish reason - map Heroku API finish reasons to AI SDK format
-            let normalizedFinishReason = finishReason;
-            const finishReasonStr = String(finishReason);
-            if (finishReasonStr === "tool_calls" ||
-                finishReasonStr === "function_call") {
+            let normalizedFinishReason = "stop";
+            if (finishReason === "tool_calls" || finishReason === "function_call") {
                 normalizedFinishReason = "tool-calls";
             }
-            else if (finishReasonStr === "content_filter") {
-                normalizedFinishReason =
-                    "content-filter";
+            else if (finishReason === "content_filter") {
+                normalizedFinishReason = "content-filter";
             }
-            else if (finishReasonStr === "max_tokens") {
+            else if (finishReason === "max_tokens") {
                 normalizedFinishReason = "length";
             }
+            else if (finishReason === "stop") {
+                normalizedFinishReason = "stop";
+            }
             else {
-                const validFinishReasons = [
-                    "stop",
-                    "length",
-                    "content-filter",
-                    "tool-calls",
-                    "error",
-                    "other",
-                ];
-                normalizedFinishReason = validFinishReasons.includes(finishReasonStr)
-                    ? finishReasonStr
-                    : "other";
+                normalizedFinishReason = "other";
             }
             return {
                 type: "finish",
@@ -1238,17 +1065,41 @@ class HerokuChatLanguageModel {
                 },
             };
         }
-        return null;
-    }
-    /**
-     * Helper method to check if a string is valid JSON using provider-utils
-     * @private
-     */
-    isValidJson(str) {
-        if (!str || str.trim() === "") {
-            return false;
+        // Handle tool calls in delta
+        if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+            for (const toolCall of delta.tool_calls) {
+                const toolCallData = toolCall;
+                const index = toolCallData.index;
+                // Get or create tool call entry
+                let streamingToolCall = this.streamingToolCalls.get(index);
+                if (!streamingToolCall) {
+                    streamingToolCall = {
+                        argsBuffer: "",
+                    };
+                    this.streamingToolCalls.set(index, streamingToolCall);
+                }
+                // Update tool call data
+                if (toolCallData.id) {
+                    streamingToolCall.id = toolCallData.id;
+                }
+                if (toolCallData.function?.name) {
+                    streamingToolCall.name = toolCallData.function.name;
+                }
+                if (toolCallData.function?.arguments) {
+                    streamingToolCall.argsBuffer += toolCallData.function.arguments;
+                }
+            }
+            // Don't return anything yet, wait for finish_reason
+            return null;
         }
-        return (0, provider_utils_1.isParsableJson)(str);
+        // Handle text delta
+        if (delta && delta.content && typeof delta.content === "string") {
+            return {
+                type: "text-delta",
+                textDelta: delta.content,
+            };
+        }
+        return null;
     }
     extractToolCalls(message) {
         if (!message || !message.tool_calls) {

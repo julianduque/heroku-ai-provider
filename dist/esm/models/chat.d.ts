@@ -91,9 +91,8 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     private readonly apiKey;
     private readonly baseUrl;
     private streamingToolCalls;
-    private textBuffer;
     /**
-     * Creates a new HerokuChatLanguageModel instance.
+     * Constructor for the Heroku Chat Language Model.
      *
      * @param model - The Heroku chat model identifier (e.g., "claude-3-5-sonnet-latest")
      * @param apiKey - Your Heroku AI API key for chat completions
@@ -320,11 +319,6 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     private mapToolChoiceToHerokuFormat;
     private mapResponseToOutput;
     private mapChunkToStreamPart;
-    /**
-     * Helper method to check if a string is valid JSON using provider-utils
-     * @private
-     */
-    private isValidJson;
     private extractToolCalls;
 }
 //# sourceMappingURL=chat.d.ts.map
