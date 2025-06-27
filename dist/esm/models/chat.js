@@ -527,9 +527,6 @@ export class HerokuChatLanguageModel {
         const promptMessages = typeof prompt === "string"
             ? [{ role: "user", content: prompt }]
             : [...prompt];
-        // DEBUG: Add logging to see what messages we're processing
-        console.log("\n--- MAP PROMPT TO MESSAGES DEBUG ---");
-        console.log("promptMessages:", JSON.stringify(promptMessages, null, 2));
         // Extract existing system message from the copied array
         const systemMessageIndex = promptMessages.findIndex((m) => m.role === "system");
         if (systemMessageIndex !== -1) {
@@ -555,8 +552,6 @@ export class HerokuChatLanguageModel {
             // Use the simple processor for regular messages
             this.processMessagesSimple(promptMessages, messages);
         }
-        console.log("Final messages:", JSON.stringify(messages, null, 2));
-        console.log("--- END MAP PROMPT DEBUG ---\n");
         return messages;
     }
     /**
@@ -601,7 +596,8 @@ export class HerokuChatLanguageModel {
                     if (convertedMessage.role === "assistant" &&
                         convertedMessage.tool_calls &&
                         convertedMessage.tool_calls.length > 0 &&
-                        (!convertedMessage.content || convertedMessage.content.trim() === "")) {
+                        (!convertedMessage.content ||
+                            convertedMessage.content.trim() === "")) {
                         convertedMessage.content = "I'll help you with that.";
                     }
                     messages.push(convertedMessage);

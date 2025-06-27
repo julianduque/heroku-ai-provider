@@ -1696,15 +1696,20 @@ describe("HerokuChatLanguageModel", () => {
       const messages = requestBody.messages as Array<{
         role: string;
         content: string;
+        tool_call_id?: string;
       }>;
 
-      // With our current implementation that prevents tool result accumulation,
-      // only the user message and latest assistant message are sent
-      expect(messages).toHaveLength(2);
+      // With our current implementation, all messages including tool results are sent
+      expect(messages).toHaveLength(3);
       expect(messages[0].role).toBe("user");
       expect(messages[0].content).toBe("Calculate 2 + 2");
       expect(messages[1].role).toBe("assistant");
       expect(messages[1].content).toBe("I'll calculate that for you.");
+      expect(messages[2].role).toBe("tool");
+      expect(messages[2].content).toBe(
+        JSON.stringify({ expression: "2 + 2", answer: 4 }, null, 2),
+      );
+      expect(messages[2].tool_call_id).toBe("call_123");
     });
   });
 
@@ -2091,7 +2096,7 @@ describe("HerokuChatLanguageModel", () => {
   });
 
   describe("message filtering", () => {
-    it("should skip assistant messages with only tool calls", async () => {
+    it("should NOT skip assistant messages with only tool calls", async () => {
       const model = new HerokuChatLanguageModel(
         "claude-3-5-sonnet-latest",
         "test-key",
@@ -2135,12 +2140,26 @@ describe("HerokuChatLanguageModel", () => {
 
       const messages = mapPromptToMessages(prompt);
 
-      // Should have 3 messages: user, assistant with text, and final user
-      // The assistant message with only tool calls should be skipped
-      expect(messages).toHaveLength(3);
+      // Should have 4 messages: user, assistant with text, assistant with tool calls, and final user
+      // The assistant message with only tool calls should NOT be skipped (this was the fix)
+      expect(messages).toHaveLength(4);
       expect(messages[0]).toEqual({ role: "user", content: "Hello" });
       expect(messages[1]).toEqual({ role: "assistant", content: "Hi there!" });
       expect(messages[2]).toEqual({
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "test-id",
+            type: "function",
+            function: {
+              name: "testTool",
+              arguments: '{"query":"test"}',
+            },
+          },
+        ],
+      });
+      expect(messages[3]).toEqual({
         role: "user",
         content: "Follow up question",
       });
