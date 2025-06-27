@@ -81,12 +81,14 @@ async function streamingToolUsageExample() {
     // Example 1: Basic streaming with weather tool
     console.log("\n📍 Example 1: Weather lookup with streaming response");
     console.log("-".repeat(50));
-    console.log('Query: "What\'s the weather like in New York and Tokyo?"');
+    console.log(
+      'Query: "What\'s the weather like in New York and Tokyo and Paris?"',
+    );
     console.log("Response: ");
 
     const weatherResult = await streamText({
       model: heroku.chat("claude-3-5-sonnet-latest"),
-      prompt: "What's the weather like in New York and Tokyo?",
+      prompt: "What's the weather like in New York and Tokyo and Paris?",
       maxSteps: 5,
       tools: {
         getWeather: tool({

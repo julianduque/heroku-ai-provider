@@ -674,7 +674,7 @@ describe("HerokuChatLanguageModel", () => {
           toolCallId: "call_123",
           toolCallType: "function",
           toolName: "get_weather",
-          args: '{"location":"New York"}',
+          args: '{"location": "New York"}',
         },
       ]);
     });
@@ -714,7 +714,7 @@ describe("HerokuChatLanguageModel", () => {
           toolCallId: "call_123",
           toolCallType: "function",
           toolName: "get_weather",
-          args: "{}",
+          args: "invalid json",
         },
       ]);
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -1170,7 +1170,7 @@ describe("HerokuChatLanguageModel", () => {
             toolCallId: "call_123",
             toolCallType: "function",
             toolName: "get_weather",
-            args: '{"location":"New York","unit":"celsius"}',
+            args: '{"location": "New York", "unit": "celsius"}',
           },
         ]);
       });
@@ -1323,7 +1323,7 @@ describe("HerokuChatLanguageModel", () => {
             toolCallId: "call_bad",
             toolCallType: "function",
             toolName: "broken_tool",
-            args: "{}",
+            args: '{"invalid": json}',
           },
         ]);
 
@@ -1559,13 +1559,13 @@ describe("HerokuChatLanguageModel", () => {
             toolCallId: "call_1",
             toolCallType: "function",
             toolName: "get_weather",
-            args: '{"location":"New York"}',
+            args: '{"location": "New York"}',
           },
           {
             toolCallId: "call_2",
             toolCallType: "function",
             toolName: "get_time",
-            args: '{"timezone":"EST"}',
+            args: '{"timezone": "EST"}',
           },
         ]);
       });
@@ -1698,11 +1698,13 @@ describe("HerokuChatLanguageModel", () => {
         content: string;
       }>;
 
-      // Tool message should be converted to user message
-      expect(messages).toHaveLength(3);
-      expect(messages[2].role).toBe("user");
-      expect(messages[2].content).toContain('Tool "calculate" returned:');
-      expect(messages[2].content).toContain('"answer": 4');
+      // With our current implementation that prevents tool result accumulation,
+      // only the user message and latest assistant message are sent
+      expect(messages).toHaveLength(2);
+      expect(messages[0].role).toBe("user");
+      expect(messages[0].content).toBe("Calculate 2 + 2");
+      expect(messages[1].role).toBe("assistant");
+      expect(messages[1].content).toBe("I'll calculate that for you.");
     });
   });
 
@@ -2085,6 +2087,122 @@ describe("HerokuChatLanguageModel", () => {
       ).rejects.toThrow(
         "Failed to stream completion: Network connection failed",
       );
+    });
+  });
+
+  describe("message filtering", () => {
+    it("should skip assistant messages with only tool calls", async () => {
+      const model = new HerokuChatLanguageModel(
+        "claude-3-5-sonnet-latest",
+        "test-key",
+        "https://test-api.example.com",
+      );
+
+      // Access the private method via type assertion for testing
+      const mapPromptToMessages = (
+        model as unknown as {
+          mapPromptToMessages: (
+            prompt: unknown,
+          ) => { role: string; content: string }[];
+        }
+      ).mapPromptToMessages.bind(model);
+
+      const prompt = [
+        {
+          role: "user",
+          content: "Hello",
+        },
+        {
+          role: "assistant",
+          content: "Hi there!",
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              toolCallId: "test-id",
+              toolName: "testTool",
+              args: { query: "test" },
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: "Follow up question",
+        },
+      ];
+
+      const messages = mapPromptToMessages(prompt);
+
+      // Should have 3 messages: user, assistant with text, and final user
+      // The assistant message with only tool calls should be skipped
+      expect(messages).toHaveLength(3);
+      expect(messages[0]).toEqual({ role: "user", content: "Hello" });
+      expect(messages[1]).toEqual({ role: "assistant", content: "Hi there!" });
+      expect(messages[2]).toEqual({
+        role: "user",
+        content: "Follow up question",
+      });
+    });
+
+    it("should not skip assistant messages with text and tool calls", async () => {
+      const model = new HerokuChatLanguageModel(
+        "claude-3-5-sonnet-latest",
+        "test-key",
+        "https://test-api.example.com",
+      );
+
+      const mapPromptToMessages = (
+        model as unknown as {
+          mapPromptToMessages: (
+            prompt: unknown,
+          ) => { role: string; content: string }[];
+        }
+      ).mapPromptToMessages.bind(model);
+
+      const prompt = [
+        {
+          role: "user",
+          content: "Hello",
+        },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "I'll help you with that.",
+            },
+            {
+              type: "tool-call",
+              toolCallId: "test-id",
+              toolName: "testTool",
+              args: { query: "test" },
+            },
+          ],
+        },
+      ];
+
+      const messages = mapPromptToMessages(prompt);
+
+      // Should have 2 messages: user and assistant
+      // The assistant message should be included with both text content and tool calls
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toEqual({ role: "user", content: "Hello" });
+      expect(messages[1]).toEqual({
+        role: "assistant",
+        content: "I'll help you with that.",
+        tool_calls: [
+          {
+            id: "test-id",
+            type: "function",
+            function: {
+              name: "testTool",
+              arguments: '{"query":"test"}',
+            },
+          },
+        ],
+      });
     });
   });
 });

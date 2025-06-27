@@ -1,6 +1,7 @@
 import { generateText, tool } from "ai";
 import { createHerokuProvider } from "../src/index";
 import { z } from "zod";
+import "dotenv/config";
 
 async function debugToolUsage() {
   const heroku = createHerokuProvider({

@@ -527,6 +527,9 @@ export class HerokuChatLanguageModel {
         const promptMessages = typeof prompt === "string"
             ? [{ role: "user", content: prompt }]
             : [...prompt];
+        // DEBUG: Add logging to see what messages we're processing
+        console.log("\n--- MAP PROMPT TO MESSAGES DEBUG ---");
+        console.log("promptMessages:", JSON.stringify(promptMessages, null, 2));
         // Extract existing system message from the copied array
         const systemMessageIndex = promptMessages.findIndex((m) => m.role === "system");
         if (systemMessageIndex !== -1) {
@@ -539,12 +542,164 @@ export class HerokuChatLanguageModel {
         if (systemMessageContent.trim() !== "") {
             messages.push({ role: "system", content: systemMessageContent.trim() });
         }
-        // Handle the rest of the messages
-        for (const item of promptMessages) {
-            const convertedMessage = this.convertMessageToHerokuFormat(item);
-            messages.push(convertedMessage);
+        // Check if there are any tool messages that need special pairing
+        const hasToolMessages = promptMessages.some((item) => item &&
+            typeof item === "object" &&
+            "role" in item &&
+            item.role === "tool");
+        if (hasToolMessages) {
+            // Use the tool pairing processor when tool messages are present
+            this.processMessagesWithToolPairing(promptMessages, messages);
         }
+        else {
+            // Use the simple processor for regular messages
+            this.processMessagesSimple(promptMessages, messages);
+        }
+        console.log("Final messages:", JSON.stringify(messages, null, 2));
+        console.log("--- END MAP PROMPT DEBUG ---\n");
         return messages;
+    }
+    /**
+     * Process messages in simple chronological order (no tool pairing needed).
+     * Used when there are no tool messages that require special handling.
+     * @internal
+     */
+    processMessagesSimple(promptMessages, messages) {
+        for (const item of promptMessages) {
+            if (this.shouldSkipMessage(item)) {
+                continue;
+            }
+            if (item && typeof item === "object" && "role" in item) {
+                const convertedMessage = this.convertMessageToHerokuFormat(item);
+                messages.push(convertedMessage);
+            }
+        }
+    }
+    /**
+     * Process messages ensuring proper tool call/result pairing to prevent API validation errors.
+     * This method processes messages chronologically while ensuring assistant messages have proper content.
+     * @internal
+     */
+    processMessagesWithToolPairing(promptMessages, messages) {
+        // Simple strategy: Process messages chronologically and ensure proper content
+        // The AI SDK already handles the pairing correctly, we just need to avoid breaking it
+        for (const item of promptMessages) {
+            if (this.shouldSkipMessage(item)) {
+                continue;
+            }
+            if (item && typeof item === "object" && "role" in item) {
+                const messageItem = item;
+                if (messageItem.role === "tool") {
+                    // Handle tool messages - split if needed and add directly
+                    const toolMessages = this.splitToolMessage(item);
+                    messages.push(...toolMessages);
+                }
+                else {
+                    // Regular message (user, assistant, system)
+                    const convertedMessage = this.convertMessageToHerokuFormat(item);
+                    // For assistant messages with tool calls but no content, provide default content
+                    if (convertedMessage.role === "assistant" &&
+                        convertedMessage.tool_calls &&
+                        convertedMessage.tool_calls.length > 0 &&
+                        (!convertedMessage.content || convertedMessage.content.trim() === "")) {
+                        convertedMessage.content = "I'll help you with that.";
+                    }
+                    messages.push(convertedMessage);
+                }
+            }
+        }
+    }
+    /**
+     * Check if a message should be skipped because it would result in empty content.
+     * This prevents messages that have no meaningful content from being sent to Heroku API.
+     * @internal
+     */
+    shouldSkipMessage(item) {
+        if (!item || typeof item !== "object") {
+            return false;
+        }
+        const messageItem = item;
+        const role = messageItem.role;
+        // Only check assistant messages
+        if (role !== "assistant") {
+            return false;
+        }
+        // If content is a string, don't skip
+        if (typeof messageItem.content === "string") {
+            return false;
+        }
+        // If content is an array, check if it contains any text parts or tool calls
+        if (Array.isArray(messageItem.content)) {
+            const hasTextContent = messageItem.content.some((part) => {
+                return (part &&
+                    typeof part === "object" &&
+                    "type" in part &&
+                    part.type === "text" &&
+                    "text" in part &&
+                    typeof part.text === "string" &&
+                    part.text.trim() !== "");
+            });
+            const hasToolCalls = messageItem.content.some((part) => {
+                return (part &&
+                    typeof part === "object" &&
+                    "type" in part &&
+                    part.type === "tool-call");
+            });
+            // Don't skip if there are tool calls, even without text content
+            if (hasToolCalls) {
+                return false;
+            }
+            // Skip if no text content and no tool calls
+            return !hasTextContent;
+        }
+        return false;
+    }
+    /**
+     * Split a tool message containing multiple tool results into separate messages.
+     * This ensures each tool result gets its own message, matching the expected API format.
+     * @internal
+     */
+    splitToolMessage(item) {
+        if (!item || typeof item !== "object") {
+            throw createValidationError("Tool message item must be an object", "toolMessageItem", item);
+        }
+        const messageItem = item;
+        if (!Array.isArray(messageItem.content)) {
+            throw createValidationError("Tool message content must be an array of tool results", "content", messageItem.content);
+        }
+        const toolMessages = [];
+        for (const part of messageItem.content) {
+            if (part &&
+                typeof part === "object" &&
+                "type" in part &&
+                part.type === "tool-result") {
+                const toolResult = part;
+                const result = toolResult.result;
+                let content = "";
+                // Format tool result as text that the model can understand
+                if (typeof result === "string") {
+                    content = result;
+                }
+                else if (typeof result === "object") {
+                    // If result is an array, wrap it in an object to ensure valid JSON object format
+                    if (Array.isArray(result)) {
+                        content = JSON.stringify({ result }, null, 2);
+                    }
+                    else {
+                        content = JSON.stringify(result, null, 2);
+                    }
+                }
+                else {
+                    content = String(result);
+                }
+                toolMessages.push({
+                    role: "tool",
+                    content,
+                    tool_call_id: toolResult.toolCallId,
+                });
+            }
+        }
+        return toolMessages;
     }
     convertMessageToHerokuFormat(item) {
         // Validate that item is an object
@@ -565,17 +720,20 @@ export class HerokuChatLanguageModel {
                 requestBodyValues: { role },
             });
         }
-        // Handle content based on message type
-        let content = "";
+        // Handle content and tool calls based on message type
         if (role === "system") {
             if (typeof messageItem.content === "string") {
-                content = messageItem.content;
+                return {
+                    role: "system",
+                    content: messageItem.content,
+                };
             }
             else {
                 throw createValidationError("System message content must be a string", "content", messageItem.content);
             }
         }
         else if (role === "user") {
+            let content = "";
             if (typeof messageItem.content === "string") {
                 content = messageItem.content;
             }
@@ -612,68 +770,73 @@ export class HerokuChatLanguageModel {
                     requestBodyValues: { content },
                 });
             }
+            return {
+                role: "user",
+                content,
+            };
         }
         else if (role === "assistant") {
+            let content = null;
+            const toolCalls = [];
             if (typeof messageItem.content === "string") {
                 content = messageItem.content;
             }
             else if (Array.isArray(messageItem.content)) {
-                // Handle array content for assistant messages
+                // Handle array content for assistant messages (text + tool calls)
                 const textParts = [];
                 for (const part of messageItem.content) {
-                    if (part &&
-                        typeof part === "object" &&
-                        "type" in part &&
-                        part.type === "text" &&
-                        "text" in part &&
-                        typeof part.text === "string") {
-                        textParts.push(part.text);
+                    if (part && typeof part === "object" && "type" in part) {
+                        if (part.type === "text" &&
+                            "text" in part &&
+                            typeof part.text === "string") {
+                            textParts.push(part.text);
+                        }
+                        else if (part.type === "tool-call") {
+                            // Extract tool call information
+                            const toolCall = part;
+                            if ("toolCallId" in toolCall &&
+                                "toolName" in toolCall &&
+                                "args" in toolCall &&
+                                typeof toolCall.toolCallId === "string" &&
+                                typeof toolCall.toolName === "string") {
+                                toolCalls.push({
+                                    id: toolCall.toolCallId,
+                                    type: "function",
+                                    function: {
+                                        name: toolCall.toolName,
+                                        arguments: typeof toolCall.args === "string"
+                                            ? toolCall.args
+                                            : JSON.stringify(toolCall.args),
+                                    },
+                                });
+                            }
+                        }
                     }
                 }
-                content = textParts.join("\n");
+                content = textParts.length > 0 ? textParts.join("\n") : null;
+            }
+            else if (messageItem.content === null ||
+                messageItem.content === undefined) {
+                // Allow null content for assistant messages with tool calls
+                content = null;
             }
             else {
-                throw createValidationError("Assistant message content must be a string or array", "content", messageItem.content);
+                throw createValidationError("Assistant message content must be a string, array, or null", "content", messageItem.content);
             }
+            const result = {
+                role: "assistant",
+                content: content || (toolCalls.length > 0 ? null : ""),
+            };
+            if (toolCalls.length > 0) {
+                result.tool_calls = toolCalls;
+            }
+            return result;
         }
-        else if (role === "tool") {
-            // Handle tool result messages from the AI SDK
-            if (Array.isArray(messageItem.content)) {
-                const toolResults = [];
-                for (const part of messageItem.content) {
-                    if (part &&
-                        typeof part === "object" &&
-                        "type" in part &&
-                        part.type === "tool-result") {
-                        const toolResult = part;
-                        const toolName = toolResult.toolName || "unknown_tool";
-                        const result = toolResult.result;
-                        // Format tool result as text that the model can understand
-                        let resultText = "";
-                        if (typeof result === "string") {
-                            resultText = result;
-                        }
-                        else if (typeof result === "object") {
-                            resultText = JSON.stringify(result, null, 2);
-                        }
-                        else {
-                            resultText = String(result);
-                        }
-                        toolResults.push(`Tool "${toolName}" returned: ${resultText}`);
-                    }
-                }
-                content = toolResults.join("\n\n");
-            }
-            else {
-                throw createValidationError("Tool message content must be an array of tool results", "content", messageItem.content);
-            }
-        }
-        // Convert tool messages to user messages since Heroku API may not support tool role
-        const finalRole = role === "tool" ? "user" : role;
-        return {
-            role: finalRole,
-            content,
-        };
+        throw new APICallError({
+            message: `Unsupported message role: ${role}`,
+            url: "",
+            requestBodyValues: { role },
+        });
     }
     mapToolsToHerokuFormat(tools) {
         if (!Array.isArray(tools)) {
@@ -961,7 +1124,7 @@ export class HerokuChatLanguageModel {
             toolCallType: "function",
             toolCallId: call.toolCallId,
             toolName: call.toolName,
-            args: JSON.stringify(call.args), // Convert to JSON string as expected by AI SDK
+            args: call.rawArgs || JSON.stringify(call.args), // Use raw JSON string from API
         }));
         // Extract usage information
         const usage = response.usage || {};
@@ -1165,8 +1328,10 @@ export class HerokuChatLanguageModel {
             const toolCall = call;
             const func = toolCall.function;
             let args = {};
+            let rawArgs = undefined;
             if (func?.arguments) {
                 if (typeof func.arguments === "string") {
+                    rawArgs = func.arguments; // Preserve the raw JSON string
                     if (func.arguments.trim()) {
                         const parseResult = safeParseJSON({ text: func.arguments });
                         if (parseResult.success) {
@@ -1181,6 +1346,7 @@ export class HerokuChatLanguageModel {
                 else if (typeof func.arguments === "object" &&
                     func.arguments !== null) {
                     args = func.arguments;
+                    rawArgs = JSON.stringify(args); // Convert object to JSON string
                 }
             }
             const toolCallId = toolCall.id || "";
@@ -1203,6 +1369,7 @@ export class HerokuChatLanguageModel {
                 toolCallType: "function",
                 toolName,
                 args,
+                rawArgs,
             });
         });
         return validToolCalls;

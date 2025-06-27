@@ -38,7 +38,8 @@
     "docs:serve": "typedoc --watch",
     "lint:staged": "lint-staged",
     "commitlint": "commitlint --edit",
-    "prepare": "husky && pnpm run build"
+    "prepare": "husky && pnpm run build",
+    "example:tool-loop": "npx tsx examples/tool-call-loop-prevention.ts"
   },
   "keywords": [
     "ai",

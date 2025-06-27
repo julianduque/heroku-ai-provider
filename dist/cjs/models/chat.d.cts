@@ -321,6 +321,30 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
         warnings: never[];
     }>;
     private mapPromptToMessages;
+    /**
+     * Process messages in simple chronological order (no tool pairing needed).
+     * Used when there are no tool messages that require special handling.
+     * @internal
+     */
+    private processMessagesSimple;
+    /**
+     * Process messages ensuring proper tool call/result pairing to prevent API validation errors.
+     * This method processes messages chronologically while ensuring assistant messages have proper content.
+     * @internal
+     */
+    private processMessagesWithToolPairing;
+    /**
+     * Check if a message should be skipped because it would result in empty content.
+     * This prevents messages that have no meaningful content from being sent to Heroku API.
+     * @internal
+     */
+    private shouldSkipMessage;
+    /**
+     * Split a tool message containing multiple tool results into separate messages.
+     * This ensures each tool result gets its own message, matching the expected API format.
+     * @internal
+     */
+    private splitToolMessage;
     private convertMessageToHerokuFormat;
     private mapToolsToHerokuFormat;
     private mapToolChoiceToHerokuFormat;
