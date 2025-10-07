@@ -1,145 +1,87 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = void 0;
-exports.createHerokuProvider = createHerokuProvider;
+exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
+exports.createHerokuAI = createHerokuAI;
 // Placeholder imports (to be implemented)
 const chat_js_1 = require('./models/chat.cjs');
 const embedding_js_1 = require('./models/embedding.cjs');
 const error_handling_js_1 = require('./utils/error-handling.cjs');
 /**
- * Creates a Heroku provider instance for the Vercel AI SDK.
+ * Creates a configurable Heroku AI provider for the Vercel AI SDK.
  *
- * This provider enables seamless integration with Heroku's AI inference services,
- * supporting both chat completions and embeddings through the Vercel AI SDK interface.
+ * This helper lets you override API keys or base URLs when the default
+ * environment variables (`INFERENCE_KEY`, `INFERENCE_URL`, `EMBEDDING_KEY`,
+ * `EMBEDDING_URL`) are not sufficient.
  *
- * @param settings - Configuration settings for the provider
+ * @param options - Optional configuration overrides for the provider
  * @returns An object with methods to access chat and embedding models
  *
  * @throws {ValidationError} When API keys are missing or URLs are invalid
  *
  * @example
- * Basic usage with environment variables:
  * ```typescript
- * import { generateText } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
- *
- * const heroku = createHerokuProvider();
+ * import { heroku } from "heroku-ai-provider";
  *
  * const { text } = await generateText({
- *   model: heroku.chat("claude-3-5-sonnet-latest"),
+ *   model: heroku.chat("claude-4-sonnet"),
  *   prompt: "What is the capital of France?"
  * });
  * ```
  *
  * @example
- * Advanced usage with tool calling:
  * ```typescript
- * import { generateText, tool } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
- * import { z } from "zod";
+ * import { createHerokuAI } from "heroku-ai-provider";
  *
- * const heroku = createHerokuProvider();
+ * const customHeroku = createHerokuAI({ chatApiKey: "my-key" });
  *
- * const { text } = await generateText({
- *   model: heroku.chat("claude-3-5-sonnet-latest"),
- *   prompt: "What's the weather like in New York?",
- *   tools: {
- *     getWeather: tool({
- *       description: "Get current weather for a location",
- *       parameters: z.object({
- *         location: z.string().describe("The city name")
- *       }),
- *       execute: async ({ location }) => {
- *         // Your weather API call here
- *         return { temperature: 72, condition: "sunny" };
- *       }
- *     })
- *   },
- *   maxSteps: 5 // Enable multi-step tool conversations
- * });
- * ```
- *
- * @example
- * Streaming chat with error handling:
- * ```typescript
- * import { streamText } from "ai";
- * import { createHerokuProvider, isConfigurationError } from "heroku-ai-provider";
- *
- * try {
- *   const heroku = createHerokuProvider();
- *
- *   const { textStream } = await streamText({
- *     model: heroku.chat("claude-3-haiku"),
- *     prompt: "Write a short story about AI"
- *   });
- *
- *   for await (const delta of textStream) {
- *     process.stdout.write(delta);
- *   }
- * } catch (error) {
- *   if (isConfigurationError(error)) {
- *     console.error("Configuration issue:", error.message);
- *   }
- * }
- * ```
- *
- * @example
- * Embeddings usage:
- * ```typescript
- * import { embed, embedMany } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
- *
- * const heroku = createHerokuProvider();
- *
- * // Single embedding
  * const { embedding } = await embed({
- *   model: heroku.embedding("cohere-embed-multilingual"),
+ *   model: customHeroku.embedding("cohere-embed-multilingual"),
  *   value: "Hello, world!"
- * });
- *
- * // Multiple embeddings
- * const { embeddings } = await embedMany({
- *   model: heroku.embedding("cohere-embed-multilingual"),
- *   values: ["First text", "Second text", "Third text"]
  * });
  * ```
  */
-function createHerokuProvider(settings = {}) {
-    // Validate settings parameter
-    if (settings && typeof settings !== "object") {
-        throw (0, error_handling_js_1.createValidationError)("Settings must be an object", "settings", settings);
+function createHerokuAI(options = {}) {
+    // Validate options parameter
+    if (options && typeof options !== "object") {
+        throw (0, error_handling_js_1.createValidationError)("Options must be an object", "options", options);
     }
-    const chatApiKey = settings.chatApiKey || process.env.HEROKU_INFERENCE_KEY;
-    const embeddingsApiKey = settings.embeddingsApiKey || process.env.HEROKU_EMBEDDING_KEY;
-    const chatBaseUrl = settings.chatBaseUrl ||
-        process.env.HEROKU_INFERENCE_URL ||
+    const chatApiKey = options.chatApiKey ??
+        process.env.INFERENCE_KEY ??
+        process.env.HEROKU_INFERENCE_KEY;
+    const embeddingsApiKey = options.embeddingsApiKey ??
+        process.env.EMBEDDING_KEY ??
+        process.env.HEROKU_EMBEDDING_KEY;
+    const chatBaseUrl = options.chatBaseUrl ??
+        process.env.INFERENCE_URL ??
+        process.env.HEROKU_INFERENCE_URL ??
         "https://us.inference.heroku.com/v1/chat/completions";
-    const embeddingsBaseUrl = settings.embeddingsBaseUrl ||
-        process.env.HEROKU_EMBEDDING_URL ||
+    const embeddingsBaseUrl = options.embeddingsBaseUrl ??
+        process.env.EMBEDDING_URL ??
+        process.env.HEROKU_EMBEDDING_URL ??
         "https://us.inference.heroku.com/v1/embeddings";
     // Validate that at least one API key is provided
     if (!chatApiKey && !embeddingsApiKey) {
-        throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set HEROKU_INFERENCE_KEY or HEROKU_EMBEDDING_KEY environment variables, or provide chatApiKey or embeddingsApiKey in settings.", "apiKeys", "[REDACTED]");
+        throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set INFERENCE_KEY or EMBEDDING_KEY environment variables (or provide chatApiKey / embeddingsApiKey).", "apiKeys", "[REDACTED]");
     }
     // Validate provided URLs if they exist
-    if (settings.chatBaseUrl) {
-        validateUrl(settings.chatBaseUrl, "chatBaseUrl");
+    if (options.chatBaseUrl) {
+        validateUrl(options.chatBaseUrl, "chatBaseUrl");
     }
-    if (settings.embeddingsBaseUrl) {
-        validateUrl(settings.embeddingsBaseUrl, "embeddingsBaseUrl");
+    if (options.embeddingsBaseUrl) {
+        validateUrl(options.embeddingsBaseUrl, "embeddingsBaseUrl");
     }
     return {
         /**
          * Creates a chat language model instance for the specified Heroku model.
          *
          * @param model - The Heroku chat model identifier
-         * @returns A HerokuChatLanguageModel instance compatible with AI SDK v1.1.3
+         * @returns A HerokuChatLanguageModel instance compatible with AI SDK v5
          *
          * @throws {ValidationError} When chat API key is missing or model is unsupported
          *
          * @example
          * ```typescript
-         * const chatModel = heroku.chat("claude-3-5-sonnet-latest");
+         * const chatModel = heroku.chat("claude-4-sonnet");
          *
          * const { text } = await generateText({
          *   model: chatModel,
@@ -149,7 +91,7 @@ function createHerokuProvider(settings = {}) {
          */
         chat: (model) => {
             if (!chatApiKey) {
-                throw (0, error_handling_js_1.createValidationError)("Chat API key is required. Set HEROKU_INFERENCE_KEY environment variable or provide chatApiKey in settings.", "chatApiKey", "[REDACTED]");
+                throw (0, error_handling_js_1.createValidationError)("Chat API key is required. Set INFERENCE_KEY environment variable or provide chatApiKey in options.", "chatApiKey", "[REDACTED]");
             }
             // Validate model against supported Heroku chat models
             validateChatModel(model);
@@ -159,7 +101,7 @@ function createHerokuProvider(settings = {}) {
          * Creates an embedding model instance for the specified Heroku model.
          *
          * @param model - The Heroku embedding model identifier
-         * @returns A HerokuEmbeddingModel instance compatible with AI SDK v1.1.3
+         * @returns A HerokuEmbeddingModel instance compatible with AI SDK v5
          *
          * @throws {ValidationError} When embeddings API key is missing or model is unsupported
          *
@@ -175,7 +117,7 @@ function createHerokuProvider(settings = {}) {
          */
         embedding: (model) => {
             if (!embeddingsApiKey) {
-                throw (0, error_handling_js_1.createValidationError)("Embeddings API key is required. Set HEROKU_EMBEDDING_KEY environment variable or provide embeddingsApiKey in settings.", "embeddingsApiKey", "[REDACTED]");
+                throw (0, error_handling_js_1.createValidationError)("Embeddings API key is required. Set EMBEDDING_KEY environment variable or provide embeddingsApiKey in options.", "embeddingsApiKey", "[REDACTED]");
             }
             // Validate model against supported Heroku embedding models
             validateEmbeddingModel(model);
@@ -213,7 +155,7 @@ function validateChatModel(model) {
         throw (0, error_handling_js_1.createValidationError)("Model must be a non-empty string", "model", model);
     }
     const supportedChatModels = [
-        "claude-3-5-sonnet-latest",
+        "claude-4-sonnet",
         "claude-3-haiku",
         "claude-4-sonnet",
         "claude-3-7-sonnet",
@@ -236,6 +178,14 @@ function validateEmbeddingModel(model) {
         throw (0, error_handling_js_1.createValidationError)(`Unsupported embedding model '${model}'. Supported models: ${supportedEmbeddingModels.join(", ")}`, "model", model);
     }
 }
+/**
+ * Default Heroku AI provider instance that reads credentials from environment variables.
+ */
+exports.heroku = createHerokuAI();
+/**
+ * @deprecated Use {@link createHerokuAI} instead.
+ */
+exports.createHerokuProvider = createHerokuAI;
 // Export the models and types for direct use
 var chat_js_2 = require('./models/chat.cjs');
 Object.defineProperty(exports, "HerokuChatLanguageModel", { enumerable: true, get: function () { return chat_js_2.HerokuChatLanguageModel; } });

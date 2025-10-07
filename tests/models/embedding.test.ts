@@ -26,7 +26,7 @@ describe("HerokuEmbeddingModel", () => {
   describe("Constructor", () => {
     it("should initialize with correct properties", () => {
       expect(model.modelId).toBe(testModel);
-      expect(model.specificationVersion).toBe("v1");
+      expect(model.specificationVersion).toBe("v2");
       expect(model.provider).toBe("heroku");
       expect(model.maxEmbeddingsPerCall).toBe(100);
     });
@@ -82,6 +82,7 @@ describe("HerokuEmbeddingModel", () => {
 
       expect(result.embeddings).toEqual([[0.1, 0.2, 0.3]]);
       expect(result.usage).toEqual({ tokens: 5 });
+      expect(result.response?.body).toEqual(mockResponse);
       expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
         testBaseUrl,
         testApiKey,
@@ -121,6 +122,7 @@ describe("HerokuEmbeddingModel", () => {
         expect.objectContaining({
           maxRetries: 3,
           timeout: 30000,
+          headers: { "X-Custom-Header": "test-value" },
         }),
       );
     });

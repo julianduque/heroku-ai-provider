@@ -1,4 +1,9 @@
-import { APICallError } from "@ai-sdk/provider";
+import {
+  APICallError,
+  EmbeddingModelV2,
+  SharedV2ProviderMetadata,
+  SharedV2ProviderOptions,
+} from "@ai-sdk/provider";
 import { makeHerokuRequest } from "../utils/api-client.js";
 import { createValidationError } from "../utils/error-handling.js";
 
@@ -74,7 +79,7 @@ interface HerokuEmbeddingResponse {
 }
 
 /**
- * Heroku embedding model implementation compatible with AI SDK v1.1.3.
+ * Heroku embedding model implementation compatible with AI SDK v5.
  *
  * This class provides embedding generation capabilities using Heroku's AI infrastructure,
  * specifically designed to work seamlessly with the Vercel AI SDK's embedding functions.
@@ -84,9 +89,8 @@ interface HerokuEmbeddingResponse {
  * Basic usage with AI SDK:
  * ```typescript
  * import { embed, embedMany } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
+ * import { heroku } from "heroku-ai-provider";
  *
- * const heroku = createHerokuProvider();
  * const model = heroku.embedding("cohere-embed-multilingual");
  *
  * // Single embedding
@@ -109,7 +113,7 @@ interface HerokuEmbeddingResponse {
  *
  * const model = new HerokuEmbeddingModel(
  *   "cohere-embed-multilingual",
- *   process.env.HEROKU_EMBEDDING_KEY!,
+ *   process.env.EMBEDDING_KEY!,
  *   "https://us.inference.heroku.com/v1/embeddings"
  * );
  *
@@ -120,8 +124,8 @@ interface HerokuEmbeddingResponse {
  * console.log(result.embeddings[0]); // [0.1, 0.2, -0.3, ...]
  * ```
  */
-export class HerokuEmbeddingModel {
-  readonly specificationVersion = "v1" as const;
+export class HerokuEmbeddingModel implements EmbeddingModelV2<string> {
+  readonly specificationVersion = "v2" as const;
   readonly provider = "heroku" as const;
   readonly modelId: string;
   readonly maxEmbeddingsPerCall = 100; // Reasonable default limit
@@ -140,7 +144,7 @@ export class HerokuEmbeddingModel {
    * ```typescript
    * const model = new HerokuEmbeddingModel(
    *   "cohere-embed-multilingual",
-   *   process.env.HEROKU_EMBEDDING_KEY!,
+   *   process.env.EMBEDDING_KEY!,
    *   "https://us.inference.heroku.com/v1/embeddings"
    * );
    * ```
@@ -281,7 +285,7 @@ export class HerokuEmbeddingModel {
   /**
    * Generate embeddings for the provided text values.
    *
-   * This method implements the AI SDK v1.1.3 EmbeddingModelV1 interface,
+   * This method implements the AI SDK v5 EmbeddingModelV2 interface,
    * providing seamless integration with the Vercel AI SDK's embedding functions.
    *
    * @param options - Configuration object containing values to embed and optional settings
@@ -343,12 +347,32 @@ export class HerokuEmbeddingModel {
   async doEmbed(options: {
     values: string[];
     abortSignal?: AbortSignal;
+    providerOptions?: SharedV2ProviderOptions;
     headers?: Record<string, string | undefined>;
   }): Promise<{
     embeddings: Array<number[]>;
     usage?: { tokens: number };
-    rawResponse?: { headers?: Record<string, string> };
+    providerMetadata?: SharedV2ProviderMetadata;
+    response?: { headers?: Record<string, string>; body?: unknown };
   }> {
+    if (options.abortSignal?.aborted) {
+      throw new APICallError({
+        message: "Embedding request was aborted before it started",
+        url: this.baseUrl,
+        requestBodyValues: {},
+        statusCode: 499,
+      });
+    }
+
+    if (
+      options.providerOptions &&
+      Object.keys(options.providerOptions).length > 0
+    ) {
+      console.warn(
+        "providerOptions are not supported for Heroku embedding models. Ignoring provided options.",
+      );
+    }
+
     // Extract values from options
     const inputArray = options.values;
 
@@ -394,6 +418,14 @@ export class HerokuEmbeddingModel {
       input: inputArray,
     };
 
+    const requestHeaders = options.headers
+      ? (Object.fromEntries(
+          Object.entries(options.headers).filter(
+            ([, value]) => value !== undefined,
+          ),
+        ) as Record<string, string>)
+      : undefined;
+
     // Note: Custom embedding options (inputType, embeddingType, truncate)
     // are not supported in the AI SDK interface. They would need to be
     // passed through provider-specific options if needed.
@@ -407,6 +439,7 @@ export class HerokuEmbeddingModel {
         {
           maxRetries: 3,
           timeout: 30000,
+          headers: requestHeaders,
         },
       )) as HerokuEmbeddingResponse;
 
@@ -479,6 +512,9 @@ export class HerokuEmbeddingModel {
         usage: response.usage
           ? { tokens: response.usage.total_tokens }
           : undefined,
+        response: {
+          body: response,
+        },
       };
     } catch (error) {
       // Re-throw APICallErrors as-is
@@ -579,7 +615,7 @@ export class HerokuEmbeddingModel {
  *
  * const model = new HerokuEmbeddingModel(
  *   "cohere-embed-multilingual",
- *   process.env.HEROKU_EMBEDDING_KEY!,
+ *   process.env.EMBEDDING_KEY!,
  *   "https://us.inference.heroku.com/v1/embeddings"
  * );
  *

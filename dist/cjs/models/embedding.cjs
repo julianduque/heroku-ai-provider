@@ -6,7 +6,7 @@ const provider_1 = require("@ai-sdk/provider");
 const api_client_js_1 = require('../utils/api-client.cjs');
 const error_handling_js_1 = require('../utils/error-handling.cjs');
 /**
- * Heroku embedding model implementation compatible with AI SDK v1.1.3.
+ * Heroku embedding model implementation compatible with AI SDK v5.
  *
  * This class provides embedding generation capabilities using Heroku's AI infrastructure,
  * specifically designed to work seamlessly with the Vercel AI SDK's embedding functions.
@@ -16,9 +16,8 @@ const error_handling_js_1 = require('../utils/error-handling.cjs');
  * Basic usage with AI SDK:
  * ```typescript
  * import { embed, embedMany } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
+ * import { heroku } from "heroku-ai-provider";
  *
- * const heroku = createHerokuProvider();
  * const model = heroku.embedding("cohere-embed-multilingual");
  *
  * // Single embedding
@@ -41,7 +40,7 @@ const error_handling_js_1 = require('../utils/error-handling.cjs');
  *
  * const model = new HerokuEmbeddingModel(
  *   "cohere-embed-multilingual",
- *   process.env.HEROKU_EMBEDDING_KEY!,
+ *   process.env.EMBEDDING_KEY!,
  *   "https://us.inference.heroku.com/v1/embeddings"
  * );
  *
@@ -66,7 +65,7 @@ class HerokuEmbeddingModel {
      * ```typescript
      * const model = new HerokuEmbeddingModel(
      *   "cohere-embed-multilingual",
-     *   process.env.HEROKU_EMBEDDING_KEY!,
+     *   process.env.EMBEDDING_KEY!,
      *   "https://us.inference.heroku.com/v1/embeddings"
      * );
      * ```
@@ -75,7 +74,7 @@ class HerokuEmbeddingModel {
         this.model = model;
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
-        this.specificationVersion = "v1";
+        this.specificationVersion = "v2";
         this.provider = "heroku";
         this.maxEmbeddingsPerCall = 100; // Reasonable default limit
         this.supportsParallelCalls = true;
@@ -147,7 +146,7 @@ class HerokuEmbeddingModel {
     /**
      * Generate embeddings for the provided text values.
      *
-     * This method implements the AI SDK v1.1.3 EmbeddingModelV1 interface,
+     * This method implements the AI SDK v5 EmbeddingModelV2 interface,
      * providing seamless integration with the Vercel AI SDK's embedding functions.
      *
      * @param options - Configuration object containing values to embed and optional settings
@@ -207,6 +206,18 @@ class HerokuEmbeddingModel {
      * ```
      */
     async doEmbed(options) {
+        if (options.abortSignal?.aborted) {
+            throw new provider_1.APICallError({
+                message: "Embedding request was aborted before it started",
+                url: this.baseUrl,
+                requestBodyValues: {},
+                statusCode: 499,
+            });
+        }
+        if (options.providerOptions &&
+            Object.keys(options.providerOptions).length > 0) {
+            console.warn("providerOptions are not supported for Heroku embedding models. Ignoring provided options.");
+        }
         // Extract values from options
         const inputArray = options.values;
         // Validate input
@@ -245,6 +256,9 @@ class HerokuEmbeddingModel {
             model: this.model,
             input: inputArray,
         };
+        const requestHeaders = options.headers
+            ? Object.fromEntries(Object.entries(options.headers).filter(([, value]) => value !== undefined))
+            : undefined;
         // Note: Custom embedding options (inputType, embeddingType, truncate)
         // are not supported in the AI SDK interface. They would need to be
         // passed through provider-specific options if needed.
@@ -253,6 +267,7 @@ class HerokuEmbeddingModel {
             const response = (await (0, api_client_js_1.makeHerokuRequest)(this.baseUrl, this.apiKey, body, {
                 maxRetries: 3,
                 timeout: 30000,
+                headers: requestHeaders,
             }));
             // Validate response structure
             if (!response.data || !Array.isArray(response.data)) {
@@ -313,6 +328,9 @@ class HerokuEmbeddingModel {
                 usage: response.usage
                     ? { tokens: response.usage.total_tokens }
                     : undefined,
+                response: {
+                    body: response,
+                },
             };
         }
         catch (error) {
@@ -405,7 +423,7 @@ exports.HerokuEmbeddingModel = HerokuEmbeddingModel;
  *
  * const model = new HerokuEmbeddingModel(
  *   "cohere-embed-multilingual",
- *   process.env.HEROKU_EMBEDDING_KEY!,
+ *   process.env.EMBEDDING_KEY!,
  *   "https://us.inference.heroku.com/v1/embeddings"
  * );
  *

@@ -1,20 +1,13 @@
 import { generateText } from "ai";
-import { createHerokuProvider } from "../src/index";
+import { heroku } from "../src/index";
 
 async function basicChatExample() {
-  // Create the Heroku provider
-  const heroku = createHerokuProvider({
-    // You can either set API keys here or use environment variables
-    // chatApiKey: 'your_api_key_here',
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("🤖 Starting basic chat example...\n");
 
     // Simple text generation
     const { text } = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: "What is the capital of France?",
     });
 
@@ -24,7 +17,7 @@ async function basicChatExample() {
 
     // Chat with system message
     const { text: explanation } = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       system:
         "You are a helpful assistant that explains complex topics in simple terms.",
       prompt: "Explain how machine learning works",
@@ -36,7 +29,7 @@ async function basicChatExample() {
 
     // Multi-turn conversation
     const { text: response } = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       messages: [
         {
           role: "user",

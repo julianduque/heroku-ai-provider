@@ -8,11 +8,11 @@ importers:
   .:
     dependencies:
       "@ai-sdk/provider":
-        specifier: ^1.1.3
-        version: 1.1.3
+        specifier: ^2.0.0
+        version: 2.0.0
       "@ai-sdk/provider-utils":
-        specifier: ^2.2.8
-        version: 2.2.8(zod@3.25.67)
+        specifier: ^3.0.0
+        version: 3.0.10(zod@3.25.67)
     devDependencies:
       "@commitlint/cli":
         specifier: ^19.8.1
@@ -33,8 +33,8 @@ importers:
         specifier: ^24.0.3
         version: 24.0.3
       ai:
-        specifier: ^4.3.16
-        version: 4.3.16(react@19.1.0)(zod@3.25.67)
+        specifier: ^5.0.0
+        version: 5.0.60(zod@3.25.67)
       dotenv:
         specifier: ^16.5.0
         version: 16.5.0
@@ -76,43 +76,30 @@ importers:
         version: 3.25.67
 
 packages:
-  "@ai-sdk/provider-utils@2.2.8":
+  "@ai-sdk/gateway@1.0.33":
     resolution:
       {
-        integrity: sha512-fqhG+4sCVv8x7nFzYnFo19ryhAa3w096Kmc3hWxMQfW/TubPOmt3A6tYZhl4mUfQWWQMsuSkLrtjlWuXBVSGQA==,
+        integrity: sha512-v9i3GPEo4t3fGcSkQkc07xM6KJN75VUv7C1Mqmmsu2xD8lQwnQfsrgAXyNuWe20yGY0eHuheSPDZhiqsGKtH1g==,
       }
     engines: { node: ">=18" }
     peerDependencies:
-      zod: ^3.23.8
+      zod: ^3.25.76 || ^4.1.8
 
-  "@ai-sdk/provider@1.1.3":
+  "@ai-sdk/provider-utils@3.0.10":
     resolution:
       {
-        integrity: sha512-qZMxYJ0qqX/RfnuIaab+zp8UAeJn/ygXXAffR5I4N0n1IrvA6qBsjc8hXLmBiMV2zoXlifkacF7sEFnYnjBcqg==,
-      }
-    engines: { node: ">=18" }
-
-  "@ai-sdk/react@1.2.12":
-    resolution:
-      {
-        integrity: sha512-jK1IZZ22evPZoQW3vlkZ7wvjYGYF+tRBKXtrcolduIkQ/m/sOAVcVeVDUDvh1T91xCnWCdUGCPZg2avZ90mv3g==,
+        integrity: sha512-T1gZ76gEIwffep6MWI0QNy9jgoybUHE7TRaHB5k54K8mF91ciGFlbtCGxDYhMH3nCRergKwYFIDeFF0hJSIQHQ==,
       }
     engines: { node: ">=18" }
     peerDependencies:
-      react: ^18 || ^19 || ^19.0.0-rc
-      zod: ^3.23.8
-    peerDependenciesMeta:
-      zod:
-        optional: true
+      zod: ^3.25.76 || ^4.1.8
 
-  "@ai-sdk/ui-utils@1.2.11":
+  "@ai-sdk/provider@2.0.0":
     resolution:
       {
-        integrity: sha512-3zcwCc8ezzFlwp3ZD15wAPjf2Au4s3vAbKsXQVyhxODHcmu0iyPO2Eua6D/vicq/AUm/BAo60r97O6HU+EI0+w==,
+        integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==,
       }
     engines: { node: ">=18" }
-    peerDependencies:
-      zod: ^3.23.8
 
   "@ampproject/remapping@2.3.0":
     resolution:
@@ -942,6 +929,12 @@ packages:
         integrity: sha512-36/hTbH2uaWuGVERyC6da9YwGWnzUZXuPro/F2LfsdOsLnCojz/iSH8MxUt/FD2S5XBSVPhmArFUXcpCQ2Hkiw==,
       }
 
+  "@standard-schema/spec@1.0.0":
+    resolution:
+      {
+        integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==,
+      }
+
   "@tybys/wasm-util@0.9.0":
     resolution:
       {
@@ -982,12 +975,6 @@ packages:
     resolution:
       {
         integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==,
-      }
-
-  "@types/diff-match-patch@1.0.36":
-    resolution:
-      {
-        integrity: sha512-xFdR6tkm0MWvBfO8xXCSsinYxHcqkQUlcHeSpMC2ukzOb6lwQAfDmW+Qt0AvlGd8HpsS28qKsB+oPeJn9I39jg==,
       }
 
   "@types/estree@1.0.8":
@@ -1321,6 +1308,13 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  "@vercel/oidc@3.0.1":
+    resolution:
+      {
+        integrity: sha512-V/YRVrJDqM6VaMBjRUrd6qRMrTKvZjHdVdEmdXsOZMulTa3iK98ijKTc3wldBmst6W5rHpqMoKllKcBAHgN7GQ==,
+      }
+    engines: { node: ">= 20" }
+
   JSONStream@1.3.5:
     resolution:
       {
@@ -1344,18 +1338,14 @@ packages:
     engines: { node: ">=0.4.0" }
     hasBin: true
 
-  ai@4.3.16:
+  ai@5.0.60:
     resolution:
       {
-        integrity: sha512-KUDwlThJ5tr2Vw0A1ZkbDKNME3wzWhuVfAOwIvFUzl1TPVDFAXDFTXio3p+jaKneB+dKNCvFFlolYmmgHttG1g==,
+        integrity: sha512-80U/3kmdBW6g+JkLXpz/P2EwkyEaWlPlYtuLUpx/JYK9F7WZh9NnkYoh1KvUi1Sbpo0NyurBTvX0a2AG9mmbDA==,
       }
     engines: { node: ">=18" }
     peerDependencies:
-      react: ^18 || ^19 || ^19.0.0-rc
-      zod: ^3.23.8
-    peerDependenciesMeta:
-      react:
-        optional: true
+      zod: ^3.25.76 || ^4.1.8
 
   ajv@6.12.6:
     resolution:
@@ -1813,12 +1803,6 @@ packages:
         integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==,
       }
 
-  diff-match-patch@1.0.5:
-    resolution:
-      {
-        integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==,
-      }
-
   dot-prop@5.3.0:
     resolution:
       {
@@ -2015,6 +1999,13 @@ packages:
       {
         integrity: sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA==,
       }
+
+  eventsource-parser@3.0.6:
+    resolution:
+      {
+        integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==,
+      }
+    engines: { node: ">=18.0.0" }
 
   execa@5.1.1:
     resolution:
@@ -2803,14 +2794,6 @@ packages:
     engines: { node: ">=6" }
     hasBin: true
 
-  jsondiffpatch@0.6.0:
-    resolution:
-      {
-        integrity: sha512-3QItJOXp2AP1uv7waBkao5nCvhEv+QmJAd38Ybq7wNI74Q+BBmnLn4EDKz6yI9xGAIQoUF87qHt+kc1IVxB4zQ==,
-      }
-    engines: { node: ^18.0.0 || >=20.0.0 }
-    hasBin: true
-
   jsonparse@1.3.1:
     resolution:
       {
@@ -3369,14 +3352,6 @@ packages:
       }
     engines: { node: ">=20.17" }
 
-  nanoid@3.3.11:
-    resolution:
-      {
-        integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==,
-      }
-    engines: { node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1 }
-    hasBin: true
-
   napi-postinstall@0.2.4:
     resolution:
       {
@@ -3651,13 +3626,6 @@ packages:
         integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==,
       }
 
-  react@19.1.0:
-    resolution:
-      {
-        integrity: sha512-FS+XFBNvn3GTAWq26joslQgWNoFu08F4kl0J4CgdNKADkdSGXQyTCnKteIAJy96Br6YbpEU1LSzV5dYtjMkMDg==,
-      }
-    engines: { node: ">=0.10.0" }
-
   require-directory@2.1.1:
     resolution:
       {
@@ -3725,12 +3693,6 @@ packages:
     resolution:
       {
         integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==,
-      }
-
-  secure-json-parse@2.7.0:
-    resolution:
-      {
-        integrity: sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw==,
       }
 
   semver@6.3.1:
@@ -3913,14 +3875,6 @@ packages:
       }
     engines: { node: ">=10" }
 
-  swr@2.3.3:
-    resolution:
-      {
-        integrity: sha512-dshNvs3ExOqtZ6kJBaAsabhPdHyeY4P2cKwRCniDVifBMoG/SVI7tfLWqPXriVspf2Rg4tPzXJTnwaihIeFw2A==,
-      }
-    peerDependencies:
-      react: ^16.11.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
   synckit@0.11.8:
     resolution:
       {
@@ -3941,13 +3895,6 @@ packages:
         integrity: sha512-te/NtwBwfiNRLf9Ijqx3T0nlqZiQ2XrrtBvu+cLL8ZRrGkO0NHTug8MYFKyoSrv/sHTaSKfilUkizV6XhxMJ3g==,
       }
     engines: { node: ">=8" }
-
-  throttleit@2.1.0:
-    resolution:
-      {
-        integrity: sha512-nt6AMGKW1p/70DF/hGBdJB57B8Tspmbp5gfJ8ilhLnt7kkr2ye7hzD6NVG8GGErk2HWF34igrL2CXmNIkzKqKw==,
-      }
-    engines: { node: ">=18" }
 
   through@2.3.8:
     resolution:
@@ -4139,14 +4086,6 @@ packages:
         integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==,
       }
 
-  use-sync-external-store@1.5.0:
-    resolution:
-      {
-        integrity: sha512-Rb46I4cGGVBmjamjphe8L/UnvJD+uPPtTkNvX5mZgqdbavhI4EbgIWJiIHXJ8bc/i9EQGPRh4DwEURJ552Do0A==,
-      }
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
   v8-to-istanbul@9.3.0:
     resolution:
       {
@@ -4258,14 +4197,6 @@ packages:
       }
     engines: { node: ">=12.20" }
 
-  zod-to-json-schema@3.24.5:
-    resolution:
-      {
-        integrity: sha512-/AuWwMP+YqiPbsJx5D6TfgRTc4kTLjsh5SOcd4bLsfUg2RcEXrFMJl1DGgdHy2aCfsIA/cr/1JM0xcB2GZji8g==,
-      }
-    peerDependencies:
-      zod: ^3.24.1
-
   zod@3.25.67:
     resolution:
       {
@@ -4279,33 +4210,23 @@ packages:
       }
 
 snapshots:
-  "@ai-sdk/provider-utils@2.2.8(zod@3.25.67)":
+  "@ai-sdk/gateway@1.0.33(zod@3.25.67)":
     dependencies:
-      "@ai-sdk/provider": 1.1.3
-      nanoid: 3.3.11
-      secure-json-parse: 2.7.0
+      "@ai-sdk/provider": 2.0.0
+      "@ai-sdk/provider-utils": 3.0.10(zod@3.25.67)
+      "@vercel/oidc": 3.0.1
       zod: 3.25.67
 
-  "@ai-sdk/provider@1.1.3":
+  "@ai-sdk/provider-utils@3.0.10(zod@3.25.67)":
+    dependencies:
+      "@ai-sdk/provider": 2.0.0
+      "@standard-schema/spec": 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 3.25.67
+
+  "@ai-sdk/provider@2.0.0":
     dependencies:
       json-schema: 0.4.0
-
-  "@ai-sdk/react@1.2.12(react@19.1.0)(zod@3.25.67)":
-    dependencies:
-      "@ai-sdk/provider-utils": 2.2.8(zod@3.25.67)
-      "@ai-sdk/ui-utils": 1.2.11(zod@3.25.67)
-      react: 19.1.0
-      swr: 2.3.3(react@19.1.0)
-      throttleit: 2.1.0
-    optionalDependencies:
-      zod: 3.25.67
-
-  "@ai-sdk/ui-utils@1.2.11(zod@3.25.67)":
-    dependencies:
-      "@ai-sdk/provider": 1.1.3
-      "@ai-sdk/provider-utils": 2.2.8(zod@3.25.67)
-      zod: 3.25.67
-      zod-to-json-schema: 3.24.5(zod@3.25.67)
 
   "@ampproject/remapping@2.3.0":
     dependencies:
@@ -4984,6 +4905,8 @@ snapshots:
     dependencies:
       "@sinonjs/commons": 3.0.1
 
+  "@standard-schema/spec@1.0.0": {}
+
   "@tybys/wasm-util@0.9.0":
     dependencies:
       tslib: 2.8.1
@@ -5017,8 +4940,6 @@ snapshots:
   "@types/debug@4.1.12":
     dependencies:
       "@types/ms": 2.1.0
-
-  "@types/diff-match-patch@1.0.36": {}
 
   "@types/estree@1.0.8": {}
 
@@ -5216,6 +5137,8 @@ snapshots:
   "@unrs/resolver-binding-win32-x64-msvc@1.9.1":
     optional: true
 
+  "@vercel/oidc@3.0.1": {}
+
   JSONStream@1.3.5:
     dependencies:
       jsonparse: 1.3.1
@@ -5227,17 +5150,13 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  ai@4.3.16(react@19.1.0)(zod@3.25.67):
+  ai@5.0.60(zod@3.25.67):
     dependencies:
-      "@ai-sdk/provider": 1.1.3
-      "@ai-sdk/provider-utils": 2.2.8(zod@3.25.67)
-      "@ai-sdk/react": 1.2.12(react@19.1.0)(zod@3.25.67)
-      "@ai-sdk/ui-utils": 1.2.11(zod@3.25.67)
+      "@ai-sdk/gateway": 1.0.33(zod@3.25.67)
+      "@ai-sdk/provider": 2.0.0
+      "@ai-sdk/provider-utils": 3.0.10(zod@3.25.67)
       "@opentelemetry/api": 1.9.0
-      jsondiffpatch: 0.6.0
       zod: 3.25.67
-    optionalDependencies:
-      react: 19.1.0
 
   ajv@6.12.6:
     dependencies:
@@ -5498,8 +5417,6 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  diff-match-patch@1.0.5: {}
-
   dot-prop@5.3.0:
     dependencies:
       is-obj: 2.0.0
@@ -5612,6 +5529,8 @@ snapshots:
   esutils@2.0.3: {}
 
   eventemitter3@5.0.1: {}
+
+  eventsource-parser@3.0.6: {}
 
   execa@5.1.1:
     dependencies:
@@ -6231,12 +6150,6 @@ snapshots:
 
   json5@2.2.3: {}
 
-  jsondiffpatch@0.6.0:
-    dependencies:
-      "@types/diff-match-patch": 1.0.36
-      chalk: 5.4.1
-      diff-match-patch: 1.0.5
-
   jsonparse@1.3.1: {}
 
   keyv@4.5.4:
@@ -6707,8 +6620,6 @@ snapshots:
 
   nano-spawn@1.0.2: {}
 
-  nanoid@3.3.11: {}
-
   napi-postinstall@0.2.4: {}
 
   natural-compare@1.4.0: {}
@@ -6835,8 +6746,6 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react@19.1.0: {}
-
   require-directory@2.1.1: {}
 
   require-from-string@2.0.2: {}
@@ -6866,8 +6775,6 @@ snapshots:
   run-parallel@1.2.0:
     dependencies:
       queue-microtask: 1.2.3
-
-  secure-json-parse@2.7.0: {}
 
   semver@6.3.1: {}
 
@@ -6957,12 +6864,6 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
-  swr@2.3.3(react@19.1.0):
-    dependencies:
-      dequal: 2.0.3
-      react: 19.1.0
-      use-sync-external-store: 1.5.0(react@19.1.0)
-
   synckit@0.11.8:
     dependencies:
       "@pkgr/core": 0.2.7
@@ -6974,8 +6875,6 @@ snapshots:
       minimatch: 3.1.2
 
   text-extensions@2.4.0: {}
-
-  throttleit@2.1.0: {}
 
   through@2.3.8: {}
 
@@ -7104,10 +7003,6 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  use-sync-external-store@1.5.0(react@19.1.0):
-    dependencies:
-      react: 19.1.0
-
   v8-to-istanbul@9.3.0:
     dependencies:
       "@jridgewell/trace-mapping": 0.3.25
@@ -7170,10 +7065,6 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   yocto-queue@1.2.1: {}
-
-  zod-to-json-schema@3.24.5(zod@3.25.67):
-    dependencies:
-      zod: 3.25.67
 
   zod@3.25.67: {}
 

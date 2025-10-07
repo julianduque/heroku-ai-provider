@@ -1,23 +1,19 @@
-import { generateText, tool } from "ai";
-import { createHerokuProvider } from "../src/index";
+import { generateText, tool, stepCountIs } from "ai";
+import { heroku } from "../src/index";
 import { z } from "zod";
 import "dotenv/config";
 
 async function debugToolUsage() {
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   console.log("🔍 Debug: Testing simple tool usage...\n");
 
   try {
     const result = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: "What is 2 + 2? Use the calculator tool to find out.",
       tools: {
         calculate: tool({
           description: "Perform mathematical calculations",
-          parameters: z.object({
+          inputSchema: z.object({
             expression: z.string().describe("The mathematical expression"),
           }),
           execute: async ({ expression }) => {
@@ -28,7 +24,7 @@ async function debugToolUsage() {
           },
         }),
       },
-      maxSteps: 3, // Allow multiple steps for tool execution + final response
+      stopWhen: stepCountIs(3),
     });
 
     console.log("\n🎯 Final result:");
@@ -41,7 +37,6 @@ async function debugToolUsage() {
       console.log("\n📋 Steps breakdown:");
       result.steps.forEach((step, index) => {
         console.log(`Step ${index + 1}:`, {
-          type: step.stepType,
           toolCalls: step.toolCalls?.length || 0,
           text:
             step.text?.slice(0, 100) +

@@ -1,5 +1,5 @@
-import { streamText, tool } from "ai";
-import { createHerokuProvider } from "../src/index";
+import { streamText, tool, stepCountIs } from "ai";
+import { heroku } from "../src/index";
 import { z } from "zod";
 import "dotenv/config";
 
@@ -70,10 +70,6 @@ async function calculateWithSteps(expression: string) {
 }
 
 async function streamingToolUsageExample() {
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("🌊🔧 Starting streaming tool usage example...\n");
     console.log("=".repeat(60));
@@ -87,13 +83,13 @@ async function streamingToolUsageExample() {
     console.log("Response: ");
 
     const weatherResult = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: "What's the weather like in New York and Tokyo and Paris?",
-      maxSteps: 5,
+      stopWhen: stepCountIs(5),
       tools: {
         getWeather: tool({
           description: "Get the current weather for a specific city",
-          parameters: z.object({
+          inputSchema: z.object({
             location: z
               .string()
               .describe('The city name (e.g., "New York", "Tokyo")'),
@@ -121,14 +117,14 @@ async function streamingToolUsageExample() {
     console.log("Response: ");
 
     const multiToolResult = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt:
         'Search for recent news about "artificial intelligence" and also calculate 125 * 8 + 45 for me',
-      maxSteps: 6,
+      stopWhen: stepCountIs(6),
       tools: {
         searchNews: tool({
           description: "Search for recent news articles on a specific topic",
-          parameters: z.object({
+          inputSchema: z.object({
             query: z.string().describe("The search topic or keyword"),
             limit: z
               .number()
@@ -145,7 +141,7 @@ async function streamingToolUsageExample() {
         calculate: tool({
           description:
             "Perform mathematical calculations with step-by-step breakdown",
-          parameters: z.object({
+          inputSchema: z.object({
             expression: z
               .string()
               .describe("The mathematical expression to calculate"),
@@ -173,7 +169,7 @@ async function streamingToolUsageExample() {
     console.log("Response: ");
 
     const conversationResult = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       messages: [
         {
           role: "user",
@@ -190,11 +186,11 @@ async function streamingToolUsageExample() {
             "Please check the weather there and find some recent news about London.",
         },
       ],
-      maxSteps: 5,
+      stopWhen: stepCountIs(5),
       tools: {
         getWeather: tool({
           description: "Get the current weather for a specific city",
-          parameters: z.object({
+          inputSchema: z.object({
             location: z.string().describe("The city name"),
           }),
           execute: async ({ location }) => {
@@ -206,7 +202,7 @@ async function streamingToolUsageExample() {
         }),
         searchNews: tool({
           description: "Search for recent news about a location or topic",
-          parameters: z.object({
+          inputSchema: z.object({
             query: z.string().describe("The search query"),
             limit: z
               .number()
@@ -239,10 +235,6 @@ async function streamingToolUsageExample() {
 
 // Advanced streaming with real-time tool execution feedback
 async function advancedStreamingToolExample() {
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("\n🚀 Advanced streaming with real-time tool feedback...\n");
     console.log("=".repeat(60));
@@ -258,14 +250,14 @@ async function advancedStreamingToolExample() {
     const streamingStartTime = Date.now();
 
     const result = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt:
         "Compare the weather in Paris and London, then calculate the temperature difference between them",
-      maxSteps: 8,
+      stopWhen: stepCountIs(8),
       tools: {
         getWeather: tool({
           description: "Get detailed weather information for a city",
-          parameters: z.object({
+          inputSchema: z.object({
             location: z.string().describe("The city name"),
           }),
           execute: async ({ location }) => {
@@ -290,7 +282,7 @@ async function advancedStreamingToolExample() {
         }),
         calculate: tool({
           description: "Perform calculations with detailed steps",
-          parameters: z.object({
+          inputSchema: z.object({
             expression: z.string().describe("Mathematical expression"),
             description: z
               .string()
@@ -342,10 +334,6 @@ async function advancedStreamingToolExample() {
 
 // Error handling in streaming tools
 async function streamingToolErrorHandlingExample() {
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("\n🛡️  Streaming tool error handling example...\n");
     console.log("=".repeat(60));
@@ -356,13 +344,13 @@ async function streamingToolErrorHandlingExample() {
     console.log("Response: ");
 
     const errorResult = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: 'Try to calculate "hello world + 5" and then calculate 10 + 5',
-      maxSteps: 5,
+      stopWhen: stepCountIs(5),
       tools: {
         calculate: tool({
           description: "Perform mathematical calculations",
-          parameters: z.object({
+          inputSchema: z.object({
             expression: z
               .string()
               .describe("Mathematical expression to calculate"),
