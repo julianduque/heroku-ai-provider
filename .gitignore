@@ -9,6 +9,9 @@ dev-debug.log
 # Dependency directories
 node_modules/
 
+# Build
+.next/
+
 # Environment variables
 .env
 
@@ -30,6 +33,7 @@ coverage/
 # Task files
 tasks.json
 tasks/ 
+
 # IDE and tool directories
 .cursor/
 .taskmaster/

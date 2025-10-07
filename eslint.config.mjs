@@ -12,6 +12,7 @@ export default defineConfig([
       "scripts/**",
       "commitlint.config.cjs",
       "docs/**",
+      "examples/nextjs-generative-ui/**",
       "coverage/**",
     ],
   },

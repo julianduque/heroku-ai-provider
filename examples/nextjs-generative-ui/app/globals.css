@@ -1,0 +1,353 @@
+:root {
+  color-scheme: light;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background-color: #f4f6fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.app-body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(
+    circle at top,
+    #f4f6fb 0%,
+    #e8ebf5 40%,
+    #dee3f2 100%
+  );
+  color: #1f2933;
+}
+
+main.chat-container {
+  margin: 0 auto;
+  min-height: 100vh;
+  max-width: 720px;
+  padding: 40px 32px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+header.chat-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+header.chat-header h1 {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 600;
+  color: #0b1120;
+}
+
+header.chat-header p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #64748b;
+}
+
+section.message-panel {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.empty-state {
+  font-size: 0.95rem;
+  color: #7b889c;
+  margin: 0;
+}
+
+article.message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.message-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.message-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #1f2937;
+}
+
+.message-text p {
+  margin: 0;
+}
+
+.message-text strong {
+  font-weight: 600;
+}
+
+.message-text code {
+  font-family:
+    "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(30, 64, 175, 0.12);
+  color: #1d4ed8;
+}
+
+.message-text pre {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  font-family:
+    "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
+}
+
+.message-placeholder {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #64748b;
+}
+
+.message-error {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+form.message-input {
+  display: flex;
+  gap: 12px;
+  background: #ffffff;
+  padding: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(21, 94, 239, 0.16);
+  box-shadow: 0 18px 32px rgba(59, 130, 246, 0.12);
+}
+
+.message-input input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 18px;
+  font-size: 1rem;
+  color: #0b1120;
+  outline: none;
+}
+
+.message-input input::placeholder {
+  color: #94a3b8;
+}
+
+.message-input button {
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.message-input button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(79, 70, 229, 0.35);
+}
+
+.message-input button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.card {
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(241, 245, 249, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 1.4rem;
+  background: rgba(15, 23, 42, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.card-icon[data-variant="weather"] {
+  background: rgba(14, 116, 144, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(14, 116, 144, 0.2);
+}
+
+.card-icon[data-variant="stock"] {
+  background: rgba(22, 163, 74, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.2);
+}
+
+.card-subheader {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.card-header {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.details-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #1f2937;
+}
+
+.details-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.details-label {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.details-value {
+  font-weight: 500;
+}
+
+.tool-preview {
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-preview::after {
+  content: "";
+  position: absolute;
+  inset: -40% 60% auto -30%;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+.tool-preview-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tool-preview-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+  background: rgba(37, 99, 235, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+.tool-preview-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1d4ed8;
+}
+
+.tool-preview-description {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: rgba(29, 78, 216, 0.8);
+}
+
+.tool-preview-json {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #e2e8f0;
+  font-family:
+    "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
+}
+
+@media (max-width: 600px) {
+  main.chat-container {
+    padding: 32px 20px 48px;
+  }
+
+  header.chat-header h1 {
+    font-size: 2rem;
+  }
+
+  .message-input button {
+    padding: 12px 18px;
+  }
+}
