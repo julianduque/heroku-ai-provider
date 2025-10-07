@@ -1,12 +1,8 @@
 import { streamText } from "ai";
-import { createHerokuProvider } from "../src/index";
+import { heroku } from "../src/index";
 
 async function streamingChatExample() {
   // Create the Heroku provider
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("🌊 Starting streaming chat example...\n");
 
@@ -17,7 +13,7 @@ async function streamingChatExample() {
     console.log("Response: ");
 
     const { textStream } = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: "Write a short story about a robot learning to paint.",
     });
 
@@ -32,7 +28,7 @@ async function streamingChatExample() {
     console.log("Response: ");
 
     const { textStream: poetryStream } = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       system: "You are a creative poet who writes in haiku format.",
       prompt: "Write a haiku about the ocean",
     });
@@ -48,7 +44,7 @@ async function streamingChatExample() {
     console.log("Response: ");
 
     const { textStream: conversationStream } = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       messages: [
         { role: "user", content: "I need help cooking dinner tonight." },
         {
@@ -76,13 +72,11 @@ async function streamingChatExample() {
 
 // Advanced streaming with event handling
 async function advancedStreamingExample() {
-  const heroku = createHerokuProvider();
-
   try {
     console.log("\n🚀 Advanced streaming with event handling...\n");
 
     const result = await streamText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: "Explain the benefits of renewable energy in 3 key points.",
     });
 

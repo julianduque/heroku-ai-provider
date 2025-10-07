@@ -1,5 +1,5 @@
-import { generateText, tool } from "ai";
-import { createHerokuProvider } from "../src/index";
+import { generateText, tool, stepCountIs } from "ai";
+import { heroku } from "../src/index";
 import { z } from "zod";
 import "dotenv/config";
 
@@ -44,22 +44,18 @@ async function calculateMath(expression: string) {
 }
 
 async function toolUsageExample() {
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("🔧 Starting tool usage example...\n");
 
     // Example 1: Weather tool
     const weatherResult = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: "What is the weather like in New York and London?",
-      maxSteps: 5, // Allow multiple steps for tool execution + final response
+      stopWhen: stepCountIs(5),
       tools: {
         getWeather: tool({
           description: "Get the current weather for a specific city",
-          parameters: z.object({
+          inputSchema: z.object({
             location: z
               .string()
               .describe('The city name (e.g., "New York", "London")'),
@@ -77,14 +73,14 @@ async function toolUsageExample() {
 
     // Example 2: Multiple tools
     const multiToolResult = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt:
         'Search for information about "machine learning" and calculate 15 * 24',
-      maxSteps: 5, // Allow multiple steps for tool execution + final response
+      stopWhen: stepCountIs(5),
       tools: {
         searchDatabase: tool({
           description: "Search the database for relevant information",
-          parameters: z.object({
+          inputSchema: z.object({
             query: z.string().describe("The search query"),
           }),
           execute: async ({ query }) => {
@@ -94,7 +90,7 @@ async function toolUsageExample() {
         }),
         calculate: tool({
           description: "Perform mathematical calculations",
-          parameters: z.object({
+          inputSchema: z.object({
             expression: z
               .string()
               .describe("The mathematical expression to calculate"),
@@ -112,12 +108,13 @@ async function toolUsageExample() {
 
     // Example 3: Tool choice control
     const specificToolResult = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
-      prompt: "I need to know the weather in Tokyo",
+      model: heroku.chat("claude-4-sonnet"),
+      prompt:
+        "Use the getWeather tool to retrieve the current weather in Tokyo, then summarize the temperature and condition in one sentence.",
       tools: {
         getWeather: tool({
           description: "Get the current weather for a specific city",
-          parameters: z.object({
+          inputSchema: z.object({
             location: z.string().describe("The city name"),
           }),
           execute: async ({ location }) => {
@@ -127,7 +124,7 @@ async function toolUsageExample() {
         }),
         getTime: tool({
           description: "Get the current time in a specific timezone",
-          parameters: z.object({
+          inputSchema: z.object({
             timezone: z.string().describe('The timezone (e.g., "UTC", "EST")'),
           }),
           execute: async ({ timezone }) => {
@@ -136,20 +133,24 @@ async function toolUsageExample() {
           },
         }),
       },
-      toolChoice: "required", // Force the model to use a tool
+      toolChoice: { type: "tool", toolName: "getWeather" },
+      stopWhen: stepCountIs(4),
     });
 
-    console.log("Specific Tool Result:", specificToolResult.text);
+    console.log(
+      "Specific Tool Result:",
+      specificToolResult.text || "(model returned no final text)",
+    );
     console.log("\n---\n");
 
     // Example 4: Error handling in tools
     const errorHandlingResult = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt: 'Calculate "not a valid expression" and then calculate 5 + 3',
       tools: {
         calculate: tool({
           description: "Perform mathematical calculations",
-          parameters: z.object({
+          inputSchema: z.object({
             expression: z
               .string()
               .describe("The mathematical expression to calculate"),
@@ -168,6 +169,7 @@ async function toolUsageExample() {
           },
         }),
       },
+      stopWhen: stepCountIs(5),
     });
 
     console.log("Error Handling Result:", errorHandlingResult.text);
@@ -182,22 +184,18 @@ async function toolUsageExample() {
 
 // Advanced tool example with complex data structures
 async function advancedToolExample() {
-  const heroku = createHerokuProvider({
-    chatApiKey: process.env.HEROKU_INFERENCE_KEY,
-  });
-
   try {
     console.log("\n🚀 Advanced tool usage example...\n");
 
     const result = await generateText({
-      model: heroku.chat("claude-3-5-sonnet-latest"),
+      model: heroku.chat("claude-4-sonnet"),
       prompt:
         'Help me manage my tasks. Add a new task called "Write documentation" with high priority, then list all my tasks.',
-      maxSteps: 5, // Allow multiple steps for tool execution + final response
+      stopWhen: stepCountIs(5),
       tools: {
         addTask: tool({
           description: "Add a new task to the task list",
-          parameters: z.object({
+          inputSchema: z.object({
             title: z.string().describe("The task title"),
             priority: z
               .enum(["low", "medium", "high"])
@@ -230,7 +228,7 @@ async function advancedToolExample() {
         }),
         listTasks: tool({
           description: "List all tasks with their details",
-          parameters: z.object({
+          inputSchema: z.object({
             filter: z
               .enum(["all", "completed", "pending"])
               .optional()

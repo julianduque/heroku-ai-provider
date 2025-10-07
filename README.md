@@ -41,26 +41,31 @@ Set your Heroku AI API keys as environment variables:
 
 ```bash
 # For chat completions
-HEROKU_INFERENCE_KEY=your_inference_api_key
+INFERENCE_KEY=your_inference_api_key
 
 # For embeddings
-HEROKU_EMBEDDING_KEY=your_embedding_api_key
+EMBEDDING_KEY=your_embedding_api_key
 
 # Optional: Custom API endpoints
-HEROKU_INFERENCE_URL=https://us.inference.heroku.com
-HEROKU_EMBEDDING_URL=https://us.inference.heroku.com
+INFERENCE_URL=https://us.inference.heroku.com
+EMBEDDING_URL=https://us.inference.heroku.com
+
 ```
 
 ### Basic Configuration
 
 ```typescript
-import { createHerokuProvider } from "heroku-ai-provider";
+import { heroku } from "heroku-ai-provider";
 
-// Using environment variables (recommended)
-const heroku = createHerokuProvider();
+const model = heroku.chat("claude-4-sonnet");
+```
 
-// Or with explicit configuration
-const heroku = createHerokuProvider({
+#### Custom Configuration
+
+```typescript
+import { createHerokuAI } from "heroku-ai-provider";
+
+const client = createHerokuAI({
   chatApiKey: "your_inference_api_key",
   embeddingsApiKey: "your_embedding_api_key",
   chatBaseUrl: "https://us.inference.heroku.com/v1/chat/completions",
@@ -76,12 +81,10 @@ const heroku = createHerokuProvider({
 
 ```typescript
 import { generateText } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
-
-const heroku = createHerokuProvider();
+import { heroku } from "heroku-ai-provider";
 
 const { text } = await generateText({
-  model: heroku.chat("claude-3-5-sonnet-latest"),
+  model: heroku.chat("claude-4-sonnet"),
   prompt: "What is the capital of France?",
 });
 
@@ -91,10 +94,8 @@ console.log(text); // "The capital of France is Paris."
 #### Streaming Chat
 
 ```typescript
-import { streamText } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
-
-const heroku = createHerokuProvider();
+import { streamText, stepCountIs } from "ai";
+import { heroku } from "heroku-ai-provider";
 
 const { textStream } = await streamText({
   model: heroku.chat("claude-3-haiku"),
@@ -110,12 +111,10 @@ for await (const delta of textStream) {
 
 ```typescript
 import { generateText } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
-
-const heroku = createHerokuProvider();
+import { heroku } from "heroku-ai-provider";
 
 const { text } = await generateText({
-  model: heroku.chat("claude-3-5-sonnet-latest"),
+  model: heroku.chat("claude-4-sonnet"),
   system: "You are a helpful assistant that explains complex topics simply.",
   prompt: "Explain quantum computing",
 });
@@ -124,14 +123,12 @@ const { text } = await generateText({
 ### Tool/Function Calling
 
 ```typescript
-import { generateText, tool } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
+import { generateText, tool, stepCountIs } from "ai";
+import { heroku } from "heroku-ai-provider";
 import { z } from "zod";
 
-const heroku = createHerokuProvider();
-
 const { text } = await generateText({
-  model: heroku.chat("claude-3-5-sonnet-latest"),
+  model: heroku.chat("claude-4-sonnet"),
   prompt: "What is the weather like in New York?",
   tools: {
     getWeather: tool({
@@ -149,21 +146,19 @@ const { text } = await generateText({
       },
     }),
   },
-  maxSteps: 5, // Allow multi-step tool conversations
+  stopWhen: stepCountIs(5),
 });
 ```
 
 #### Advanced Tool Usage with Multiple Steps
 
 ```typescript
-import { generateText, tool } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
+import { generateText, tool, stepCountIs } from "ai";
+import { heroku } from "heroku-ai-provider";
 import { z } from "zod";
 
-const heroku = createHerokuProvider();
-
 const { text, steps } = await generateText({
-  model: heroku.chat("claude-3-5-sonnet-latest"),
+  model: heroku.chat("claude-4-sonnet"),
   prompt:
     "Check the weather in New York and then suggest appropriate clothing.",
   tools: {
@@ -183,7 +178,7 @@ const { text, steps } = await generateText({
     }),
     suggestClothing: tool({
       description: "Suggest appropriate clothing based on weather conditions",
-      parameters: z.object({
+      inputSchema: z.object({
         temperature: z.number().describe("Temperature in Fahrenheit"),
         condition: z.string().describe("Weather condition"),
         humidity: z.number().optional().describe("Humidity percentage"),
@@ -201,7 +196,7 @@ const { text, steps } = await generateText({
       },
     }),
   },
-  maxSteps: 5,
+  stopWhen: stepCountIs(5),
 });
 
 console.log("Final response:", text);
@@ -214,9 +209,7 @@ console.log("Tool execution steps:", steps.length);
 
 ```typescript
 import { embed } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
-
-const heroku = createHerokuProvider();
+import { heroku } from "heroku-ai-provider";
 
 const { embedding } = await embed({
   model: heroku.embedding("cohere-embed-multilingual"),
@@ -230,9 +223,7 @@ console.log(embedding); // [0.1, 0.2, -0.3, ...]
 
 ```typescript
 import { embedMany } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
-
-const heroku = createHerokuProvider();
+import { heroku } from "heroku-ai-provider";
 
 const { embeddings } = await embedMany({
   model: heroku.embedding("cohere-embed-multilingual"),
@@ -249,7 +240,7 @@ import { createEmbedFunction } from "heroku-ai-provider";
 
 // Create a reusable embed function
 const embedText = createEmbedFunction({
-  apiKey: process.env.HEROKU_EMBEDDING_KEY!,
+  apiKey: process.env.EMBEDDING_KEY!,
   model: "cohere-embed-multilingual",
 });
 
@@ -264,12 +255,12 @@ console.log(embedding); // [0.1, 0.2, -0.3, ...]
 ```typescript
 interface HerokuProviderSettings {
   // API keys (falls back to environment variables)
-  chatApiKey?: string; // HEROKU_INFERENCE_KEY
-  embeddingsApiKey?: string; // HEROKU_EMBEDDING_KEY
+  chatApiKey?: string; // INFERENCE_KEY
+  embeddingsApiKey?: string; // EMBEDDING_KEY
 
   // Base URLs (falls back to environment variables or defaults)
-  chatBaseUrl?: string; // HEROKU_INFERENCE_URL
-  embeddingsBaseUrl?: string; // HEROKU_EMBEDDING_URL
+  chatBaseUrl?: string; // INFERENCE_URL
+  embeddingsBaseUrl?: string; // EMBEDDING_URL
 }
 ```
 
@@ -277,11 +268,14 @@ interface HerokuProviderSettings {
 
 #### Chat Models
 
-- `claude-3-5-sonnet-latest` - Latest Claude 3.5 Sonnet (recommended)
-- `claude-3-haiku` - Fast and efficient Claude 3 Haiku
-- `claude-4-sonnet` - Claude 4 Sonnet (when available)
-- `claude-3-7-sonnet` - Claude 3.7 Sonnet
-- `claude-3-5-haiku` - Claude 3.5 Haiku
+- `claude-4-sonnet` - Latest Claude 4 Sonnet by Anthropic
+- `claude-3-haiku` - Claude 3 Haiku by Anthropic
+- `claude-3-7-sonnet` - Claude 3.7 Sonnet by Anthropic
+- `claude-3-5-haiku` - Claude 3.5 Haiku by Anthropic
+- `claude-3-5-sonnet-latest` - Claude 3.5 Sonnet by Anthropic
+- `gpt-oss-120b` - gpt-oss-120b by OpenAI
+- `nova-lite` - Nova Lite by Amazon
+- `nova-pro` - Nova Pro by Amazon
 
 #### Embedding Models
 
@@ -293,18 +287,16 @@ interface HerokuProviderSettings {
 
 ```typescript
 // app/api/chat/route.ts
-import { streamText } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
-
-const heroku = createHerokuProvider();
+import { streamText, stepCountIs } from "ai";
+import { heroku } from "heroku-ai-provider";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = await streamText({
-    model: heroku.chat("claude-3-5-sonnet-latest"),
+    model: heroku.chat("claude-4-sonnet"),
     messages,
-    maxSteps: 5, // Enable multi-step tool conversations
+    stopWhen: stepCountIs(5), // Enable multi-step tool conversations
   });
 
   return result.toDataStreamResponse();
@@ -316,21 +308,19 @@ export async function POST(req: Request) {
 ```typescript
 // app/api/chat/route.ts
 import { streamText, tool } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
+import { heroku } from "heroku-ai-provider";
 import { z } from "zod";
-
-const heroku = createHerokuProvider();
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = await streamText({
-    model: heroku.chat("claude-3-5-sonnet-latest"),
+    model: heroku.chat("claude-4-sonnet"),
     messages,
     tools: {
       getTime: tool({
         description: "Get the current time",
-        parameters: z.object({
+        inputSchema: z.object({
           timezone: z
             .string()
             .optional()
@@ -344,7 +334,7 @@ export async function POST(req: Request) {
         },
       }),
     },
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
   });
 
   return result.toDataStreamResponse();
@@ -356,10 +346,9 @@ export async function POST(req: Request) {
 ```typescript
 import express from "express";
 import { generateText } from "ai";
-import { createHerokuProvider } from "heroku-ai-provider";
+import { heroku } from "heroku-ai-provider";
 
 const app = express();
-const heroku = createHerokuProvider();
 
 app.post("/chat", async (req, res) => {
   const { prompt } = req.body;
@@ -379,15 +368,14 @@ The provider includes comprehensive error handling with user-friendly error mess
 
 ```typescript
 import {
-  createHerokuProvider,
+  createHerokuAI,
   isConfigurationError,
   isTemporaryServiceError,
 } from "heroku-ai-provider";
 
 try {
-  const heroku = createHerokuProvider();
   const result = await generateText({
-    model: heroku.chat("claude-3-5-sonnet-latest"),
+    model: heroku.chat("claude-4-sonnet"),
     prompt: "Hello!",
   });
 } catch (error) {
@@ -410,7 +398,7 @@ try {
 #### Authentication Errors
 
 - **Issue**: "Chat API key is required" or "Embeddings API key is required"
-- **Solution**: Ensure your API keys are set in environment variables or passed directly to `createHerokuProvider()`
+- **Solution**: Ensure your API keys are set in environment variables or passed directly to `createHerokuAI()`
 
 #### Model Not Found
 
@@ -430,7 +418,7 @@ try {
 #### Tool Execution Issues
 
 - **Issue**: Tools are called but AI doesn't provide final response
-- **Solution**: Ensure you're using `maxSteps: 5` or higher to allow multi-step tool conversations
+- **Solution**: Ensure you configure `stopWhen` (for example, `stopWhen: stepCountIs(5)`) so the model can complete multi-step tool conversations
 
 #### Schema Validation Errors
 

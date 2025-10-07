@@ -1,3 +1,4 @@
+import { EmbeddingModelV2, SharedV2ProviderMetadata, SharedV2ProviderOptions } from "@ai-sdk/provider";
 /**
  * Configuration options for embedding generation.
  *
@@ -41,7 +42,7 @@ export interface EmbeddingOptions {
     truncate?: "NONE" | "START" | "END";
 }
 /**
- * Heroku embedding model implementation compatible with AI SDK v1.1.3.
+ * Heroku embedding model implementation compatible with AI SDK v5.
  *
  * This class provides embedding generation capabilities using Heroku's AI infrastructure,
  * specifically designed to work seamlessly with the Vercel AI SDK's embedding functions.
@@ -51,9 +52,8 @@ export interface EmbeddingOptions {
  * Basic usage with AI SDK:
  * ```typescript
  * import { embed, embedMany } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
+ * import { heroku } from "heroku-ai-provider";
  *
- * const heroku = createHerokuProvider();
  * const model = heroku.embedding("cohere-embed-multilingual");
  *
  * // Single embedding
@@ -76,7 +76,7 @@ export interface EmbeddingOptions {
  *
  * const model = new HerokuEmbeddingModel(
  *   "cohere-embed-multilingual",
- *   process.env.HEROKU_EMBEDDING_KEY!,
+ *   process.env.EMBEDDING_KEY!,
  *   "https://us.inference.heroku.com/v1/embeddings"
  * );
  *
@@ -87,11 +87,11 @@ export interface EmbeddingOptions {
  * console.log(result.embeddings[0]); // [0.1, 0.2, -0.3, ...]
  * ```
  */
-export declare class HerokuEmbeddingModel {
+export declare class HerokuEmbeddingModel implements EmbeddingModelV2<string> {
     private readonly model;
     private readonly apiKey;
     private readonly baseUrl;
-    readonly specificationVersion: "v1";
+    readonly specificationVersion: "v2";
     readonly provider: "heroku";
     readonly modelId: string;
     readonly maxEmbeddingsPerCall = 100;
@@ -109,7 +109,7 @@ export declare class HerokuEmbeddingModel {
      * ```typescript
      * const model = new HerokuEmbeddingModel(
      *   "cohere-embed-multilingual",
-     *   process.env.HEROKU_EMBEDDING_KEY!,
+     *   process.env.EMBEDDING_KEY!,
      *   "https://us.inference.heroku.com/v1/embeddings"
      * );
      * ```
@@ -123,7 +123,7 @@ export declare class HerokuEmbeddingModel {
     /**
      * Generate embeddings for the provided text values.
      *
-     * This method implements the AI SDK v1.1.3 EmbeddingModelV1 interface,
+     * This method implements the AI SDK v5 EmbeddingModelV2 interface,
      * providing seamless integration with the Vercel AI SDK's embedding functions.
      *
      * @param options - Configuration object containing values to embed and optional settings
@@ -185,14 +185,17 @@ export declare class HerokuEmbeddingModel {
     doEmbed(options: {
         values: string[];
         abortSignal?: AbortSignal;
+        providerOptions?: SharedV2ProviderOptions;
         headers?: Record<string, string | undefined>;
     }): Promise<{
         embeddings: Array<number[]>;
         usage?: {
             tokens: number;
         };
-        rawResponse?: {
+        providerMetadata?: SharedV2ProviderMetadata;
+        response?: {
             headers?: Record<string, string>;
+            body?: unknown;
         };
     }>;
     /**
@@ -254,7 +257,7 @@ export declare class HerokuEmbeddingModel {
  *
  * const model = new HerokuEmbeddingModel(
  *   "cohere-embed-multilingual",
- *   process.env.HEROKU_EMBEDDING_KEY!,
+ *   process.env.EMBEDDING_KEY!,
  *   "https://us.inference.heroku.com/v1/embeddings"
  * );
  *

@@ -1,8 +1,8 @@
-import { LanguageModelV1, LanguageModelV1CallOptions, LanguageModelV1FunctionTool, LanguageModelV1ProviderDefinedTool, LanguageModelV1ToolChoice, LanguageModelV1FunctionToolCall, LanguageModelV1StreamPart, LanguageModelV1FinishReason } from "@ai-sdk/provider";
-export type ToolInput = LanguageModelV1FunctionTool | LanguageModelV1ProviderDefinedTool;
-export type ToolChoiceInput = LanguageModelV1ToolChoice;
+import { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2CallWarning, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2FunctionTool, LanguageModelV2ProviderDefinedTool, LanguageModelV2StreamPart, LanguageModelV2ToolChoice, LanguageModelV2Usage } from "@ai-sdk/provider";
+export type ToolInput = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool;
+export type ToolChoiceInput = LanguageModelV2ToolChoice | "auto" | "none" | "required" | string;
 /**
- * Heroku chat language model implementation compatible with AI SDK v1.1.3.
+ * Heroku chat language model implementation compatible with AI SDK v5.
  *
  * This class provides chat completion capabilities using Heroku's AI infrastructure,
  * specifically designed to work seamlessly with the Vercel AI SDK's chat functions.
@@ -10,16 +10,16 @@ export type ToolChoiceInput = LanguageModelV1ToolChoice;
  * AI SDK features.
  *
  * @class HerokuChatLanguageModel
- * Implements the LanguageModelV1 interface from @ai-sdk/provider.
+ * Implements the LanguageModelV2 interface from @ai-sdk/provider.
  *
  * @example
  * Basic usage with AI SDK:
  * ```typescript
  * import { generateText, streamText } from "ai";
- * import { createHerokuProvider } from "heroku-ai-provider";
+ * import { heroku } from "heroku-ai-provider";
  *
- * const heroku = createHerokuProvider();
- * const model = heroku.chat("claude-3-5-sonnet-latest");
+ * const model = heroku.chat("claude-4-sonnet");
+
  *
  * // Generate text
  * const { text } = await generateText({
@@ -58,7 +58,7 @@ export type ToolChoiceInput = LanguageModelV1ToolChoice;
  *       }
  *     })
  *   },
- *   maxSteps: 5 // Enable multi-step tool conversations
+ *   stopWhen: stepCountIs(5)
  * });
  * ```
  *
@@ -68,8 +68,8 @@ export type ToolChoiceInput = LanguageModelV1ToolChoice;
  * import { HerokuChatLanguageModel } from "heroku-ai-provider";
  *
  * const model = new HerokuChatLanguageModel(
- *   "claude-3-5-sonnet-latest",
- *   process.env.HEROKU_INFERENCE_KEY!,
+ *   "claude-4-sonnet",
+ *   process.env.INFERENCE_KEY!,
  *   "https://us.inference.heroku.com/v1/chat/completions"
  * );
  *
@@ -82,21 +82,24 @@ export type ToolChoiceInput = LanguageModelV1ToolChoice;
  * console.log(result.text);
  * ```
  */
-export declare class HerokuChatLanguageModel implements LanguageModelV1 {
+export declare class HerokuChatLanguageModel implements LanguageModelV2 {
     private readonly model;
-    readonly specificationVersion: "v1";
+    readonly specificationVersion: "v2";
     readonly provider: "heroku";
     readonly modelId: string;
-    readonly defaultObjectGenerationMode: "json";
+    readonly supportedUrls: Record<string, RegExp[]>;
     private readonly apiKey;
     private readonly baseUrl;
     private streamingToolCalls;
     private streamingFinishReason;
     private streamingUsage;
+    private streamingTextId;
+    private streamingTextClosed;
+    private currentStructuredOutputToolName;
     /**
      * Constructor for the Heroku Chat Language Model.
      *
-     * @param model - The Heroku chat model identifier (e.g., "claude-3-5-sonnet-latest")
+     * @param model - The Heroku chat model identifier (e.g., "claude-4-sonnet")
      * @param apiKey - Your Heroku AI API key for chat completions
      * @param baseUrl - The base URL for the Heroku chat completions API
      *
@@ -105,8 +108,8 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
      * @example
      * ```typescript
      * const model = new HerokuChatLanguageModel(
-     *   "claude-3-5-sonnet-latest",
-     *   process.env.HEROKU_INFERENCE_KEY!,
+     *   "claude-4-sonnet",
+     *   process.env.INFERENCE_KEY!,
      *   "https://us.inference.heroku.com/v1/chat/completions"
      * );
      * ```
@@ -125,200 +128,56 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     /**
      * Generate a chat completion using the Heroku AI API.
      *
-     * This method implements the AI SDK v1.1.3 LanguageModelV1 interface for
-     * non-streaming chat completions. It supports all standard AI SDK features
-     * including tool calling, system messages, and conversation history.
+     * This method implements the AI SDK v5 LanguageModelV2 interface for
+     * non-streaming chat completions, including tool calling and conversation history.
      *
      * @param options - Configuration options for the chat completion
-     * @returns Promise resolving to the completion result with text, tool calls, and metadata
+     * @returns Completion content, usage metadata, and any provider warnings
      *
      * @throws {APICallError} When the API request fails or input validation fails
      *
      * @example
-     * Basic text generation:
      * ```typescript
      * const result = await model.doGenerate({
-     *   inputFormat: "prompt",
-     *   mode: { type: "regular" },
-     *   prompt: "Explain quantum computing in simple terms"
+     *   prompt: [
+     *     { role: "user", content: [{ type: "text", text: "Tell me a joke" }] },
+     *   ],
      * });
-     *
-     * console.log(result.text);
-     * console.log(result.usage); // Token usage information
-     * ```
-     *
-     * @example
-     * With conversation history:
-     * ```typescript
-     * const result = await model.doGenerate({
-     *   inputFormat: "messages",
-     *   mode: { type: "regular" },
-     *   messages: [
-     *     { role: "system", content: "You are a helpful assistant" },
-     *     { role: "user", content: "What is the capital of France?" },
-     *     { role: "assistant", content: "The capital of France is Paris." },
-     *     { role: "user", content: "What about Germany?" }
-     *   ]
-     * });
-     * ```
-     *
-     * @example
-     * With tool calling:
-     * ```typescript
-     * const result = await model.doGenerate({
-     *   inputFormat: "prompt",
-     *   mode: {
-     *     type: "regular",
-     *     tools: [{
-     *       type: "function",
-     *       name: "getWeather",
-     *       description: "Get current weather",
-     *       parameters: {
-     *         type: "object",
-     *         properties: {
-     *           location: { type: "string" }
-     *         }
-     *       }
-     *     }],
-     *     toolChoice: { type: "auto" }
-     *   },
-     *   prompt: "What's the weather in New York?"
-     * });
-     *
-     * if (result.toolCalls?.length > 0) {
-     *   console.log("Tool called:", result.toolCalls[0].toolName);
-     *   console.log("Arguments:", result.toolCalls[0].args);
-     * }
+     * console.log(result.content[0]);
      * ```
      */
-    doGenerate(options: LanguageModelV1CallOptions): Promise<{
-        text: string;
-        toolCalls: LanguageModelV1FunctionToolCall[] | undefined;
-        finishReason: LanguageModelV1FinishReason;
-        usage: {
-            promptTokens: number;
-            completionTokens: number;
+    doGenerate(options: LanguageModelV2CallOptions): Promise<{
+        content: LanguageModelV2Content[];
+        finishReason: LanguageModelV2FinishReason;
+        usage: LanguageModelV2Usage;
+        providerMetadata: undefined;
+        request: {
+            body: Record<string, unknown>;
         };
-        rawCall: {
-            rawPrompt: unknown;
-            rawSettings: {};
+        response: {
+            body: Record<string, unknown>;
+            id?: string;
+            timestamp?: Date;
+            modelId?: string;
         };
+        warnings: LanguageModelV2CallWarning[];
     }>;
     /**
      * Generate a streaming chat completion using the Heroku AI API.
      *
-     * This method implements the AI SDK v1.1.3 LanguageModelV1 interface for
-     * streaming chat completions. It returns a ReadableStream that emits
-     * incremental updates as the model generates the response.
-     *
-     * @param options - Configuration options for the streaming chat completion
-     * @returns Promise resolving to a ReadableStream of completion parts
-     *
-     * @throws {APICallError} When the API request fails or input validation fails
-     *
-     * @example
-     * Basic streaming:
-     * ```typescript
-     * const stream = await model.doStream({
-     *   inputFormat: "prompt",
-     *   mode: { type: "regular" },
-     *   prompt: "Write a short story about AI"
-     * });
-     *
-     * const reader = stream.getReader();
-     * try {
-     *   while (true) {
-     *     const { done, value } = await reader.read();
-     *     if (done) break;
-     *
-     *     if (value.type === "text-delta") {
-     *       process.stdout.write(value.textDelta);
-     *     } else if (value.type === "finish") {
-     *       console.log("\nFinish reason:", value.finishReason);
-     *       console.log("Usage:", value.usage);
-     *     }
-     *   }
-     * } finally {
-     *   reader.releaseLock();
-     * }
-     * ```
-     *
-     * @example
-     * Streaming with tool calls:
-     * ```typescript
-     * const stream = await model.doStream({
-     *   inputFormat: "prompt",
-     *   mode: {
-     *     type: "regular",
-     *     tools: [{
-     *       type: "function",
-     *       name: "calculate",
-     *       description: "Perform calculations",
-     *       parameters: {
-     *         type: "object",
-     *         properties: {
-     *           expression: { type: "string" }
-     *         }
-     *       }
-     *     }]
-     *   },
-     *   prompt: "What is 15 * 24?"
-     * });
-     *
-     * const reader = stream.getReader();
-     * try {
-     *   while (true) {
-     *     const { done, value } = await reader.read();
-     *     if (done) break;
-     *
-     *     switch (value.type) {
-     *       case "text-delta":
-     *         process.stdout.write(value.textDelta);
-     *         break;
-     *       case "tool-call":
-     *         console.log("Tool call:", value.toolName, value.args);
-     *         break;
-     *       case "tool-result":
-     *         console.log("Tool result:", value.result);
-     *         break;
-     *     }
-     *   }
-     * } finally {
-     *   reader.releaseLock();
-     * }
-     * ```
-     *
-     * @example
-     * Error handling with streaming:
-     * ```typescript
-     * try {
-     *   const stream = await model.doStream({
-     *     inputFormat: "prompt",
-     *     mode: { type: "regular" },
-     *     prompt: "Hello, world!"
-     *   });
-     *
-     *   // Process stream...
-     * } catch (error) {
-     *   if (error instanceof APICallError) {
-     *     console.error("API Error:", error.message);
-     *     console.error("Status:", error.statusCode);
-     *   }
-     * }
-     * ```
+     * This method implements the AI SDK v5 LanguageModelV2 interface for
+     * streaming chat completions and returns a readable stream of structured parts.
      */
-    doStream(options: LanguageModelV1CallOptions): Promise<{
-        stream: ReadableStream<LanguageModelV1StreamPart>;
-        rawCall: {
-            rawPrompt: unknown;
-            rawSettings: Record<string, unknown>;
+    doStream(options: LanguageModelV2CallOptions): Promise<{
+        stream: ReadableStream<LanguageModelV2StreamPart>;
+        request: {
+            body: Record<string, unknown>;
         };
-        rawResponse: {
+        response: {
             headers: {
                 [k: string]: string;
             } | undefined;
         };
-        warnings: never[];
     }>;
     private mapPromptToMessages;
     /**
@@ -348,8 +207,23 @@ export declare class HerokuChatLanguageModel implements LanguageModelV1 {
     private convertMessageToHerokuFormat;
     private mapToolsToHerokuFormat;
     private mapToolChoiceToHerokuFormat;
+    private shouldReleaseToolChoice;
+    private assertToolExists;
     private mapResponseToOutput;
-    private mapChunkToStreamPart;
+    private extractMessageText;
+    private normalizeFinishReason;
+    private extractResponseMetadata;
+    private collectCallWarnings;
+    private isSupportedResponseFormat;
+    private normalizeHeaders;
+    private prepareStructuredOutputConfig;
+    private sanitizeStructuredSchema;
+    private normalizeStructuredToolName;
+    private buildStructuredOutputInstruction;
+    private mapChunkToStreamParts;
+    private flushStreamingToolCalls;
+    private extractStructuredOutputText;
+    private collectToolCallCandidates;
     private extractToolCalls;
 }
 //# sourceMappingURL=chat.d.ts.map
