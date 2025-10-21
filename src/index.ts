@@ -1,6 +1,6 @@
-// Placeholder imports (to be implemented)
 import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
+import { HerokuImageModel } from "./models/image.js";
 import { createValidationError } from "./utils/error-handling.js";
 
 /**
@@ -32,6 +32,12 @@ export interface HerokuAIOptions {
   embeddingsApiKey?: string;
 
   /**
+   * API key for image generations.
+   * @default process.env.DIFFUSION_KEY ?? process.env.INFERENCE_KEY
+   */
+  imageApiKey?: string;
+
+  /**
    * Base URL for chat completions API.
    * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/chat/completions"
    */
@@ -42,6 +48,12 @@ export interface HerokuAIOptions {
    * @default process.env.EMBEDDING_URL ?? "https://us.inference.heroku.com/v1/embeddings"
    */
   embeddingsBaseUrl?: string;
+
+  /**
+   * Base URL for image generations API.
+   * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations"
+   */
+  imageBaseUrl?: string;
 }
 
 /**
@@ -101,6 +113,10 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     options.embeddingsApiKey ??
     process.env.EMBEDDING_KEY ??
     process.env.HEROKU_EMBEDDING_KEY;
+  const imageApiKey =
+    options.imageApiKey ??
+    process.env.DIFFUSION_KEY ??
+    process.env.HEROKU_DIFFUSION_KEY;
   const chatBaseUrl =
     options.chatBaseUrl ??
     process.env.INFERENCE_URL ??
@@ -111,11 +127,18 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     process.env.EMBEDDING_URL ??
     process.env.HEROKU_EMBEDDING_URL ??
     "https://us.inference.heroku.com/v1/embeddings";
+  const imageBaseUrl =
+    options.imageBaseUrl ??
+    process.env.DIFFUSION_URL ??
+    process.env.HEROKU_DIFFUSION_URL ??
+    process.env.IMAGES_URL ??
+    process.env.HEROKU_IMAGES_URL ??
+    "https://us.inference.heroku.com/v1/images/generations";
 
   // Validate that at least one API key is provided
-  if (!chatApiKey && !embeddingsApiKey) {
+  if (!chatApiKey && !embeddingsApiKey && !imageApiKey) {
     throw createValidationError(
-      "At least one API key must be provided. Set INFERENCE_KEY or EMBEDDING_KEY environment variables (or provide chatApiKey / embeddingsApiKey).",
+      "At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey in options.",
       "apiKeys",
       "[REDACTED]",
     );
@@ -127,6 +150,9 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
   }
   if (options.embeddingsBaseUrl) {
     validateUrl(options.embeddingsBaseUrl, "embeddingsBaseUrl");
+  }
+  if (options.imageBaseUrl) {
+    validateUrl(options.imageBaseUrl, "imageBaseUrl");
   }
 
   return {
@@ -198,6 +224,38 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
         embeddingsApiKey,
         embeddingsBaseUrl,
       );
+    },
+
+    /**
+     * Creates an image generation model instance for the specified Heroku model.
+     *
+     * @param model - The Heroku image generation model identifier
+     * @returns A HerokuImageModel instance compatible with AI SDK v5
+     *
+     * @throws {ValidationError} When the image API key is missing or the model identifier is invalid
+     *
+     * @example
+     * ```typescript
+     * const imageModel = heroku.image("stable-image-ultra");
+     *
+     * const { images } = await generateImage({
+     *   model: imageModel,
+     *   prompt: "A scenic view of mountains during sunrise"
+     * });
+     * ```
+     */
+    image: (model: string) => {
+      if (!imageApiKey) {
+        throw createValidationError(
+          "Image API key is required. Set DIFFUSION_KEY environment variable or provide imageApiKey in options.",
+          "imageApiKey",
+          "[REDACTED]",
+        );
+      }
+
+      validateImageModel(model);
+
+      return new HerokuImageModel(model, imageApiKey, imageBaseUrl);
     },
   };
 }
@@ -291,6 +349,38 @@ function validateEmbeddingModel(model: string): void {
 }
 
 /**
+ * Validate image model identifier for Heroku image generation.
+ * @internal
+ */
+function validateImageModel(model: string): void {
+  if (!model || typeof model !== "string") {
+    throw createValidationError(
+      "Model must be a non-empty string",
+      "model",
+      model,
+    );
+  }
+
+  if (model.trim().length === 0) {
+    throw createValidationError(
+      "Model cannot be empty or whitespace",
+      "model",
+      model,
+    );
+  }
+
+  const supportedImageModels = ["stable-image-ultra"];
+
+  if (!supportedImageModels.includes(model)) {
+    throw createValidationError(
+      `Unsupported image model '${model}'. Supported models: ${supportedImageModels.join(", ")}`,
+      "model",
+      model,
+    );
+  }
+}
+
+/**
  * Default Heroku AI provider instance that reads credentials from environment variables.
  */
 export const heroku = createHerokuAI();
@@ -306,6 +396,7 @@ export {
   HerokuEmbeddingModel,
   createEmbedFunction,
 } from "./models/embedding.js";
+export { HerokuImageModel } from "./models/image.js";
 export type { EmbeddingOptions } from "./models/embedding.js";
 
 // Export error handling utilities

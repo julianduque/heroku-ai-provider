@@ -340,6 +340,7 @@ export class HerokuChatLanguageModel implements LanguageModelV2 {
       "claude-4-sonnet",
       "claude-3-haiku",
       "claude-4-sonnet",
+      "claude-4-5-sonnet",
       "claude-3-7-sonnet",
       "claude-3-5-haiku",
       "claude-3-5-sonnet-latest",

@@ -4,8 +4,9 @@ A TypeScript provider for the [Vercel AI SDK](https://sdk.vercel.ai/) that enabl
 
 ## Features
 
-- 🤖 **Chat Completions**: Support for Claude 3.5 Sonnet, Claude 3 Haiku, and other Heroku-hosted models
+- 🤖 **Chat Completions**: Support for Claude 4.5 Sonnet, Claude 4 Sonnet, Claude 3.7 Sonnet, Claude 3.5 Haiku, gpt-oss-120b, Nova Lite, Nova Pro and other Heroku-hosted models
 - 🧠 **Embeddings**: Generate vector embeddings using Cohere's multilingual embedding model
+- 🖼️ **Image Generation**: Create images with Stability AI’s Stable Image Ultra diffusion model
 - 🔧 **Tool Support**: Function calling capabilities for building AI agents and assistants
 - 📡 **Streaming**: Real-time streaming responses for chat completions
 - 🔐 **TypeScript**: Full TypeScript support with comprehensive type definitions
@@ -46,10 +47,13 @@ INFERENCE_KEY=your_inference_api_key
 # For embeddings
 EMBEDDING_KEY=your_embedding_api_key
 
+# For image generations
+DIFFUSION_KEY=your_diffusion_api_key
+
 # Optional: Custom API endpoints
 INFERENCE_URL=https://us.inference.heroku.com
 EMBEDDING_URL=https://us.inference.heroku.com
-
+DIFFUSION_URL=https://us.inference.heroku.com
 ```
 
 ### Basic Configuration
@@ -70,6 +74,8 @@ const client = createHerokuAI({
   embeddingsApiKey: "your_embedding_api_key",
   chatBaseUrl: "https://us.inference.heroku.com/v1/chat/completions",
   embeddingsBaseUrl: "https://us.inference.heroku.com/v1/embeddings",
+  imageApiKey: "your_diffusion_api_key",
+  imageBaseUrl: "https://us.inference.heroku.com/v1/images/generations",
 });
 ```
 
@@ -248,6 +254,22 @@ const embedding = await embedText("Hello, world!");
 console.log(embedding); // [0.1, 0.2, -0.3, ...]
 ```
 
+### Image Generation
+
+```typescript
+import { experimental_generateImage as generateImage } from "ai";
+import { heroku } from "heroku-ai-provider";
+
+const result = await generateImage({
+  model: heroku.image("stable-image-ultra"),
+  prompt: "A watercolor illustration of a lighthouse at sunrise",
+  size: "1024x1024",
+});
+
+const imageBytes = result.image.uint8Array;
+console.log("Generated image bytes length:", imageBytes.length);
+```
+
 ## Configuration Options
 
 ### HerokuProviderSettings
@@ -257,10 +279,12 @@ interface HerokuProviderSettings {
   // API keys (falls back to environment variables)
   chatApiKey?: string; // INFERENCE_KEY
   embeddingsApiKey?: string; // EMBEDDING_KEY
+  imageApiKey?: string; // DIFFUSION_KEY
 
   // Base URLs (falls back to environment variables or defaults)
   chatBaseUrl?: string; // INFERENCE_URL
   embeddingsBaseUrl?: string; // EMBEDDING_URL
+  imageBaseUrl?: string; // DIFFUSION_URL
 }
 ```
 
@@ -268,7 +292,8 @@ interface HerokuProviderSettings {
 
 #### Chat Models
 
-- `claude-4-sonnet` - Latest Claude 4 Sonnet by Anthropic
+- `claude-4-sonnet` - Claude 4 Sonnet by Anthropic
+- `claude-4-5-sonnet` - Claude 4.5 Sonnet by Anthropic
 - `claude-3-haiku` - Claude 3 Haiku by Anthropic
 - `claude-3-7-sonnet` - Claude 3.7 Sonnet by Anthropic
 - `claude-3-5-haiku` - Claude 3.5 Haiku by Anthropic
@@ -280,6 +305,10 @@ interface HerokuProviderSettings {
 #### Embedding Models
 
 - `cohere-embed-multilingual` - Multilingual embedding model by Cohere
+
+#### Image Models
+
+- `stable-image-ultra` - Stable Image Ultra diffusion model by Stability AI
 
 ## Framework Integration
 

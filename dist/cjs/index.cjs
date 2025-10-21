@@ -1,10 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
+exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.HerokuImageModel = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
 exports.createHerokuAI = createHerokuAI;
-// Placeholder imports (to be implemented)
 const chat_js_1 = require('./models/chat.cjs');
 const embedding_js_1 = require('./models/embedding.cjs');
+const image_js_1 = require('./models/image.cjs');
 const error_handling_js_1 = require('./utils/error-handling.cjs');
 /**
  * Creates a configurable Heroku AI provider for the Vercel AI SDK.
@@ -51,6 +51,9 @@ function createHerokuAI(options = {}) {
     const embeddingsApiKey = options.embeddingsApiKey ??
         process.env.EMBEDDING_KEY ??
         process.env.HEROKU_EMBEDDING_KEY;
+    const imageApiKey = options.imageApiKey ??
+        process.env.DIFFUSION_KEY ??
+        process.env.HEROKU_DIFFUSION_KEY;
     const chatBaseUrl = options.chatBaseUrl ??
         process.env.INFERENCE_URL ??
         process.env.HEROKU_INFERENCE_URL ??
@@ -59,9 +62,15 @@ function createHerokuAI(options = {}) {
         process.env.EMBEDDING_URL ??
         process.env.HEROKU_EMBEDDING_URL ??
         "https://us.inference.heroku.com/v1/embeddings";
+    const imageBaseUrl = options.imageBaseUrl ??
+        process.env.DIFFUSION_URL ??
+        process.env.HEROKU_DIFFUSION_URL ??
+        process.env.IMAGES_URL ??
+        process.env.HEROKU_IMAGES_URL ??
+        "https://us.inference.heroku.com/v1/images/generations";
     // Validate that at least one API key is provided
-    if (!chatApiKey && !embeddingsApiKey) {
-        throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set INFERENCE_KEY or EMBEDDING_KEY environment variables (or provide chatApiKey / embeddingsApiKey).", "apiKeys", "[REDACTED]");
+    if (!chatApiKey && !embeddingsApiKey && !imageApiKey) {
+        throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey in options.", "apiKeys", "[REDACTED]");
     }
     // Validate provided URLs if they exist
     if (options.chatBaseUrl) {
@@ -69,6 +78,9 @@ function createHerokuAI(options = {}) {
     }
     if (options.embeddingsBaseUrl) {
         validateUrl(options.embeddingsBaseUrl, "embeddingsBaseUrl");
+    }
+    if (options.imageBaseUrl) {
+        validateUrl(options.imageBaseUrl, "imageBaseUrl");
     }
     return {
         /**
@@ -122,6 +134,31 @@ function createHerokuAI(options = {}) {
             // Validate model against supported Heroku embedding models
             validateEmbeddingModel(model);
             return new embedding_js_1.HerokuEmbeddingModel(model, embeddingsApiKey, embeddingsBaseUrl);
+        },
+        /**
+         * Creates an image generation model instance for the specified Heroku model.
+         *
+         * @param model - The Heroku image generation model identifier
+         * @returns A HerokuImageModel instance compatible with AI SDK v5
+         *
+         * @throws {ValidationError} When the image API key is missing or the model identifier is invalid
+         *
+         * @example
+         * ```typescript
+         * const imageModel = heroku.image("stable-image-ultra");
+         *
+         * const { images } = await generateImage({
+         *   model: imageModel,
+         *   prompt: "A scenic view of mountains during sunrise"
+         * });
+         * ```
+         */
+        image: (model) => {
+            if (!imageApiKey) {
+                throw (0, error_handling_js_1.createValidationError)("Image API key is required. Set DIFFUSION_KEY environment variable or provide imageApiKey in options.", "imageApiKey", "[REDACTED]");
+            }
+            validateImageModel(model);
+            return new image_js_1.HerokuImageModel(model, imageApiKey, imageBaseUrl);
         },
     };
 }
@@ -179,6 +216,22 @@ function validateEmbeddingModel(model) {
     }
 }
 /**
+ * Validate image model identifier for Heroku image generation.
+ * @internal
+ */
+function validateImageModel(model) {
+    if (!model || typeof model !== "string") {
+        throw (0, error_handling_js_1.createValidationError)("Model must be a non-empty string", "model", model);
+    }
+    if (model.trim().length === 0) {
+        throw (0, error_handling_js_1.createValidationError)("Model cannot be empty or whitespace", "model", model);
+    }
+    const supportedImageModels = ["stable-image-ultra"];
+    if (!supportedImageModels.includes(model)) {
+        throw (0, error_handling_js_1.createValidationError)(`Unsupported image model '${model}'. Supported models: ${supportedImageModels.join(", ")}`, "model", model);
+    }
+}
+/**
  * Default Heroku AI provider instance that reads credentials from environment variables.
  */
 exports.heroku = createHerokuAI();
@@ -192,6 +245,8 @@ Object.defineProperty(exports, "HerokuChatLanguageModel", { enumerable: true, ge
 var embedding_js_2 = require('./models/embedding.cjs');
 Object.defineProperty(exports, "HerokuEmbeddingModel", { enumerable: true, get: function () { return embedding_js_2.HerokuEmbeddingModel; } });
 Object.defineProperty(exports, "createEmbedFunction", { enumerable: true, get: function () { return embedding_js_2.createEmbedFunction; } });
+var image_js_2 = require('./models/image.cjs');
+Object.defineProperty(exports, "HerokuImageModel", { enumerable: true, get: function () { return image_js_2.HerokuImageModel; } });
 // Export error handling utilities
 var user_friendly_errors_js_1 = require('./utils/user-friendly-errors.cjs');
 Object.defineProperty(exports, "createUserFriendlyError", { enumerable: true, get: function () { return user_friendly_errors_js_1.createUserFriendlyError; } });
