@@ -33,7 +33,7 @@ export interface HerokuAIOptions {
 
   /**
    * API key for image generations.
-   * @default process.env.DIFFUSION_KEY ?? process.env.INFERENCE_KEY
+   * @default process.env.DIFFUSION_KEY ?? process.env.HEROKU_DIFFUSION_KEY
    */
   imageApiKey?: string;
 
