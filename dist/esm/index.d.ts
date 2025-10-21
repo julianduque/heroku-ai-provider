@@ -1,5 +1,6 @@
 import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
+import { HerokuImageModel } from "./models/image.js";
 /**
  * Configuration settings for the Heroku AI provider.
  *
@@ -27,6 +28,11 @@ export interface HerokuAIOptions {
      */
     embeddingsApiKey?: string;
     /**
+     * API key for image generations.
+     * @default process.env.DIFFUSION_KEY ?? process.env.INFERENCE_KEY
+     */
+    imageApiKey?: string;
+    /**
      * Base URL for chat completions API.
      * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/chat/completions"
      */
@@ -36,6 +42,11 @@ export interface HerokuAIOptions {
      * @default process.env.EMBEDDING_URL ?? "https://us.inference.heroku.com/v1/embeddings"
      */
     embeddingsBaseUrl?: string;
+    /**
+     * Base URL for image generations API.
+     * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations"
+     */
+    imageBaseUrl?: string;
 }
 /**
  * @deprecated Use {@link HerokuAIOptions} instead.
@@ -114,6 +125,25 @@ export declare function createHerokuAI(options?: HerokuAIOptions): {
      * ```
      */
     embedding: (model: string) => HerokuEmbeddingModel;
+    /**
+     * Creates an image generation model instance for the specified Heroku model.
+     *
+     * @param model - The Heroku image generation model identifier
+     * @returns A HerokuImageModel instance compatible with AI SDK v5
+     *
+     * @throws {ValidationError} When the image API key is missing or the model identifier is invalid
+     *
+     * @example
+     * ```typescript
+     * const imageModel = heroku.image("stable-image-ultra");
+     *
+     * const { images } = await generateImage({
+     *   model: imageModel,
+     *   prompt: "A scenic view of mountains during sunrise"
+     * });
+     * ```
+     */
+    image: (model: string) => HerokuImageModel;
 };
 /**
  * Default Heroku AI provider instance that reads credentials from environment variables.
@@ -157,6 +187,25 @@ export declare const heroku: {
      * ```
      */
     embedding: (model: string) => HerokuEmbeddingModel;
+    /**
+     * Creates an image generation model instance for the specified Heroku model.
+     *
+     * @param model - The Heroku image generation model identifier
+     * @returns A HerokuImageModel instance compatible with AI SDK v5
+     *
+     * @throws {ValidationError} When the image API key is missing or the model identifier is invalid
+     *
+     * @example
+     * ```typescript
+     * const imageModel = heroku.image("stable-image-ultra");
+     *
+     * const { images } = await generateImage({
+     *   model: imageModel,
+     *   prompt: "A scenic view of mountains during sunrise"
+     * });
+     * ```
+     */
+    image: (model: string) => HerokuImageModel;
 };
 /**
  * @deprecated Use {@link createHerokuAI} instead.
@@ -164,6 +213,7 @@ export declare const heroku: {
 export declare const createHerokuProvider: typeof createHerokuAI;
 export { HerokuChatLanguageModel } from "./models/chat.js";
 export { HerokuEmbeddingModel, createEmbedFunction, } from "./models/embedding.js";
+export { HerokuImageModel } from "./models/image.js";
 export type { EmbeddingOptions } from "./models/embedding.js";
 export { createUserFriendlyError, formatUserFriendlyError, createSimpleErrorMessage, createDetailedErrorReport, isConfigurationError, isTemporaryServiceError, getContextualHelp, type UserFriendlyError, } from "./utils/user-friendly-errors.js";
 export { HerokuErrorType, ErrorSeverity, ErrorCategory, type HerokuErrorResponse, type ErrorMetadata, } from "./utils/error-types.js";
