@@ -19,32 +19,32 @@ import { HerokuImageModel } from "./models/image.js";
 export interface HerokuAIOptions {
     /**
      * API key for chat completions.
-     * @default process.env.INFERENCE_KEY
+     * @default process.env.INFERENCE_KEY (Node.js only; not available in browsers)
      */
     chatApiKey?: string;
     /**
      * API key for embeddings.
-     * @default process.env.EMBEDDING_KEY
+     * @default process.env.EMBEDDING_KEY (Node.js only; not available in browsers)
      */
     embeddingsApiKey?: string;
     /**
      * API key for image generations.
-     * @default process.env.DIFFUSION_KEY ?? process.env.HEROKU_DIFFUSION_KEY
+     * @default process.env.DIFFUSION_KEY ?? process.env.HEROKU_DIFFUSION_KEY (Node.js only; not available in browsers)
      */
     imageApiKey?: string;
     /**
      * Base URL for chat completions API.
-     * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/chat/completions"
+     * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/chat/completions" (process.env only available in Node.js)
      */
     chatBaseUrl?: string;
     /**
      * Base URL for embeddings API.
-     * @default process.env.EMBEDDING_URL ?? "https://us.inference.heroku.com/v1/embeddings"
+     * @default process.env.EMBEDDING_URL ?? "https://us.inference.heroku.com/v1/embeddings" (process.env only available in Node.js)
      */
     embeddingsBaseUrl?: string;
     /**
      * Base URL for image generations API.
-     * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations"
+     * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations" (process.env only available in Node.js)
      */
     imageBaseUrl?: string;
 }
@@ -58,6 +58,9 @@ export type HerokuProviderSettings = HerokuAIOptions;
  * This helper lets you override API keys or base URLs when the default
  * environment variables (`INFERENCE_KEY`, `INFERENCE_URL`, `EMBEDDING_KEY`,
  * `EMBEDDING_URL`) are not sufficient.
+ *
+ * **Browser Compatibility**: In browser environments, `process.env` is not available.
+ * You must provide API keys via the options parameter (e.g., `chatApiKey`, `embeddingsApiKey`, `imageApiKey`).
  *
  * @param options - Optional configuration overrides for the provider
  * @returns An object with methods to access chat and embedding models

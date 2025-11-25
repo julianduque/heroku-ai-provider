@@ -79,6 +79,38 @@ const client = createHerokuAI({
 });
 ```
 
+### Browser Usage
+
+This library is compatible with browser environments. However, since `process.env` is not available in browsers, you **must** provide API keys via the options parameter. **At least one API key is required** - you only need to provide the keys for the features you're using:
+
+```typescript
+import { createHerokuAI } from "heroku-ai-provider";
+
+// Example: Only using chat completions
+const heroku = createHerokuAI({
+  chatApiKey: "your_inference_api_key",
+});
+
+// Or if you need multiple features, provide the relevant keys
+const heroku = createHerokuAI({
+  chatApiKey: "your_inference_api_key",
+  embeddingsApiKey: "your_embedding_api_key",
+  // imageApiKey not needed if you're not using image generation
+});
+
+// Now you can use it normally
+const { text } = await generateText({
+  model: heroku.chat("claude-4-sonnet"),
+  prompt: "Hello, world!",
+});
+```
+
+**Security Note**: Never hardcode API keys in client-side code. In browser applications, consider:
+
+- Using environment variables at build time (via bundlers like Vite, Webpack, etc.)
+- Storing keys securely on your backend and proxying requests
+- Using server-side API routes to handle authentication
+
 ## Usage Examples
 
 ### Chat Completions

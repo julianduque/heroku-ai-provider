@@ -4,6 +4,22 @@ import { HerokuImageModel } from "./models/image.js";
 import { createValidationError } from "./utils/error-handling.js";
 
 /**
+ * Safely access environment variables in both Node.js and browser environments.
+ * In browsers, process.env may not be available, so this function handles that gracefully.
+ * @internal
+ */
+function getEnvVar(key: string): string | undefined {
+  if (
+    typeof process !== "undefined" &&
+    process.env &&
+    typeof process.env === "object"
+  ) {
+    return process.env[key];
+  }
+  return undefined;
+}
+
+/**
  * Configuration settings for the Heroku AI provider.
  *
  * @example
@@ -21,37 +37,37 @@ import { createValidationError } from "./utils/error-handling.js";
 export interface HerokuAIOptions {
   /**
    * API key for chat completions.
-   * @default process.env.INFERENCE_KEY
+   * @default process.env.INFERENCE_KEY (Node.js only; not available in browsers)
    */
   chatApiKey?: string;
 
   /**
    * API key for embeddings.
-   * @default process.env.EMBEDDING_KEY
+   * @default process.env.EMBEDDING_KEY (Node.js only; not available in browsers)
    */
   embeddingsApiKey?: string;
 
   /**
    * API key for image generations.
-   * @default process.env.DIFFUSION_KEY ?? process.env.HEROKU_DIFFUSION_KEY
+   * @default process.env.DIFFUSION_KEY ?? process.env.HEROKU_DIFFUSION_KEY (Node.js only; not available in browsers)
    */
   imageApiKey?: string;
 
   /**
    * Base URL for chat completions API.
-   * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/chat/completions"
+   * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/chat/completions" (process.env only available in Node.js)
    */
   chatBaseUrl?: string;
 
   /**
    * Base URL for embeddings API.
-   * @default process.env.EMBEDDING_URL ?? "https://us.inference.heroku.com/v1/embeddings"
+   * @default process.env.EMBEDDING_URL ?? "https://us.inference.heroku.com/v1/embeddings" (process.env only available in Node.js)
    */
   embeddingsBaseUrl?: string;
 
   /**
    * Base URL for image generations API.
-   * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations"
+   * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations" (process.env only available in Node.js)
    */
   imageBaseUrl?: string;
 }
@@ -67,6 +83,9 @@ export type HerokuProviderSettings = HerokuAIOptions;
  * This helper lets you override API keys or base URLs when the default
  * environment variables (`INFERENCE_KEY`, `INFERENCE_URL`, `EMBEDDING_KEY`,
  * `EMBEDDING_URL`) are not sufficient.
+ *
+ * **Browser Compatibility**: In browser environments, `process.env` is not available.
+ * You must provide API keys via the options parameter (e.g., `chatApiKey`, `embeddingsApiKey`, `imageApiKey`).
  *
  * @param options - Optional configuration overrides for the provider
  * @returns An object with methods to access chat and embedding models
@@ -107,38 +126,38 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
 
   const chatApiKey =
     options.chatApiKey ??
-    process.env.INFERENCE_KEY ??
-    process.env.HEROKU_INFERENCE_KEY;
+    getEnvVar("INFERENCE_KEY") ??
+    getEnvVar("HEROKU_INFERENCE_KEY");
   const embeddingsApiKey =
     options.embeddingsApiKey ??
-    process.env.EMBEDDING_KEY ??
-    process.env.HEROKU_EMBEDDING_KEY;
+    getEnvVar("EMBEDDING_KEY") ??
+    getEnvVar("HEROKU_EMBEDDING_KEY");
   const imageApiKey =
     options.imageApiKey ??
-    process.env.DIFFUSION_KEY ??
-    process.env.HEROKU_DIFFUSION_KEY;
+    getEnvVar("DIFFUSION_KEY") ??
+    getEnvVar("HEROKU_DIFFUSION_KEY");
   const chatBaseUrl =
     options.chatBaseUrl ??
-    process.env.INFERENCE_URL ??
-    process.env.HEROKU_INFERENCE_URL ??
+    getEnvVar("INFERENCE_URL") ??
+    getEnvVar("HEROKU_INFERENCE_URL") ??
     "https://us.inference.heroku.com/v1/chat/completions";
   const embeddingsBaseUrl =
     options.embeddingsBaseUrl ??
-    process.env.EMBEDDING_URL ??
-    process.env.HEROKU_EMBEDDING_URL ??
+    getEnvVar("EMBEDDING_URL") ??
+    getEnvVar("HEROKU_EMBEDDING_URL") ??
     "https://us.inference.heroku.com/v1/embeddings";
   const imageBaseUrl =
     options.imageBaseUrl ??
-    process.env.DIFFUSION_URL ??
-    process.env.HEROKU_DIFFUSION_URL ??
-    process.env.IMAGES_URL ??
-    process.env.HEROKU_IMAGES_URL ??
+    getEnvVar("DIFFUSION_URL") ??
+    getEnvVar("HEROKU_DIFFUSION_URL") ??
+    getEnvVar("IMAGES_URL") ??
+    getEnvVar("HEROKU_IMAGES_URL") ??
     "https://us.inference.heroku.com/v1/images/generations";
 
   // Validate that at least one API key is provided
   if (!chatApiKey && !embeddingsApiKey && !imageApiKey) {
     throw createValidationError(
-      "At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey in options.",
+      "At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.",
       "apiKeys",
       "[REDACTED]",
     );
@@ -177,7 +196,7 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     chat: (model: string) => {
       if (!chatApiKey) {
         throw createValidationError(
-          "Chat API key is required. Set INFERENCE_KEY environment variable or provide chatApiKey in options.",
+          "Chat API key is required. Set INFERENCE_KEY environment variable or provide chatApiKey in options. Note: In browser environments, you must provide chatApiKey in options.",
           "chatApiKey",
           "[REDACTED]",
         );
@@ -210,7 +229,7 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     embedding: (model: string) => {
       if (!embeddingsApiKey) {
         throw createValidationError(
-          "Embeddings API key is required. Set EMBEDDING_KEY environment variable or provide embeddingsApiKey in options.",
+          "Embeddings API key is required. Set EMBEDDING_KEY environment variable or provide embeddingsApiKey in options. Note: In browser environments, you must provide embeddingsApiKey in options.",
           "embeddingsApiKey",
           "[REDACTED]",
         );
@@ -247,7 +266,7 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     image: (model: string) => {
       if (!imageApiKey) {
         throw createValidationError(
-          "Image API key is required. Set DIFFUSION_KEY environment variable or provide imageApiKey in options.",
+          "Image API key is required. Set DIFFUSION_KEY environment variable or provide imageApiKey in options. Note: In browser environments, you must provide imageApiKey in options.",
           "imageApiKey",
           "[REDACTED]",
         );
