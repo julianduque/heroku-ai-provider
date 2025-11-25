@@ -58,7 +58,6 @@ async function executeRequest(url, apiKey, body, config, attempt) {
     const headers = {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "User-Agent": "heroku-ai-provider/1.0.0",
         "X-Request-Attempt": attempt.toString(),
         ...config.headers,
     };
