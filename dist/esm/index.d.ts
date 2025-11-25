@@ -2,6 +2,19 @@ import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
 import { HerokuImageModel } from "./models/image.js";
 /**
+ * Ensures the base URL has the correct API endpoint path appended.
+ * The environment variables typically only provide the domain (e.g., https://us.inference.heroku.com)
+ * without the full path, so we need to append the appropriate endpoint.
+ *
+ * This function handles:
+ * - Base domain only: https://us.inference.heroku.com → appends path
+ * - Already has full path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Trailing slashes: normalizes them to prevent double slashes
+ *
+ * @internal
+ */
+export declare function ensureEndpointPath(baseUrl: string, endpointPath: string): string;
+/**
  * Configuration settings for the Heroku AI provider.
  *
  * @example
@@ -148,9 +161,6 @@ export declare function createHerokuAI(options?: HerokuAIOptions): {
      */
     image: (model: string) => HerokuImageModel;
 };
-/**
- * Default Heroku AI provider instance that reads credentials from environment variables.
- */
 export declare const heroku: {
     /**
      * Creates a chat language model instance for the specified Heroku model.

@@ -16,6 +16,56 @@ function getEnvVar(key) {
     return undefined;
 }
 /**
+ * Ensures the base URL has the correct API endpoint path appended.
+ * The environment variables typically only provide the domain (e.g., https://us.inference.heroku.com)
+ * without the full path, so we need to append the appropriate endpoint.
+ *
+ * This function handles:
+ * - Base domain only: https://us.inference.heroku.com → appends path
+ * - Already has full path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Trailing slashes: normalizes them to prevent double slashes
+ *
+ * @internal
+ */
+export function ensureEndpointPath(baseUrl, endpointPath) {
+    if (!baseUrl) {
+        return baseUrl;
+    }
+    // Remove trailing slash from base URL for consistent handling
+    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    // Normalize the endpoint path to ensure it starts with /
+    const normalizedEndpoint = endpointPath.startsWith("/")
+        ? endpointPath
+        : `/${endpointPath}`;
+    // Check if the URL already ends with the endpoint path (with or without trailing slash)
+    // This prevents double paths like /v1/chat/completions/v1/chat/completions
+    if (normalizedBase.endsWith(normalizedEndpoint)) {
+        return normalizedBase;
+    }
+    // Also check if the endpoint path is already present (handles cases with trailing content)
+    // Use a regex to match the endpoint at the end of the path portion
+    try {
+        const url = new URL(normalizedBase);
+        const pathname = url.pathname.replace(/\/+$/, "");
+        // If pathname already ends with the endpoint, return normalized base
+        if (pathname.endsWith(normalizedEndpoint)) {
+            return normalizedBase;
+        }
+        // If pathname contains the full endpoint path, return as-is
+        if (pathname.includes(normalizedEndpoint)) {
+            return normalizedBase;
+        }
+    }
+    catch {
+        // If URL parsing fails, fall back to simple string check
+        if (normalizedBase.includes(normalizedEndpoint)) {
+            return normalizedBase;
+        }
+    }
+    // Append the endpoint path
+    return `${normalizedBase}${normalizedEndpoint}`;
+}
+/**
  * Creates a configurable Heroku AI provider for the Vercel AI SDK.
  *
  * This helper lets you override API keys or base URLs when the default
@@ -66,20 +116,29 @@ export function createHerokuAI(options = {}) {
     const imageApiKey = options.imageApiKey ??
         getEnvVar("DIFFUSION_KEY") ??
         getEnvVar("HEROKU_DIFFUSION_KEY");
-    const chatBaseUrl = options.chatBaseUrl ??
+    // Get base URLs from options or environment, then ensure proper endpoint paths
+    // Environment variables typically only provide the domain without the API path
+    const CHAT_ENDPOINT = "/v1/chat/completions";
+    const EMBEDDINGS_ENDPOINT = "/v1/embeddings";
+    const IMAGE_ENDPOINT = "/v1/images/generations";
+    const DEFAULT_BASE_URL = "https://us.inference.heroku.com";
+    const rawChatBaseUrl = options.chatBaseUrl ??
         getEnvVar("INFERENCE_URL") ??
         getEnvVar("HEROKU_INFERENCE_URL") ??
-        "https://us.inference.heroku.com/v1/chat/completions";
-    const embeddingsBaseUrl = options.embeddingsBaseUrl ??
+        DEFAULT_BASE_URL;
+    const chatBaseUrl = ensureEndpointPath(rawChatBaseUrl, CHAT_ENDPOINT);
+    const rawEmbeddingsBaseUrl = options.embeddingsBaseUrl ??
         getEnvVar("EMBEDDING_URL") ??
         getEnvVar("HEROKU_EMBEDDING_URL") ??
-        "https://us.inference.heroku.com/v1/embeddings";
-    const imageBaseUrl = options.imageBaseUrl ??
+        DEFAULT_BASE_URL;
+    const embeddingsBaseUrl = ensureEndpointPath(rawEmbeddingsBaseUrl, EMBEDDINGS_ENDPOINT);
+    const rawImageBaseUrl = options.imageBaseUrl ??
         getEnvVar("DIFFUSION_URL") ??
         getEnvVar("HEROKU_DIFFUSION_URL") ??
         getEnvVar("IMAGES_URL") ??
         getEnvVar("HEROKU_IMAGES_URL") ??
-        "https://us.inference.heroku.com/v1/images/generations";
+        DEFAULT_BASE_URL;
+    const imageBaseUrl = ensureEndpointPath(rawImageBaseUrl, IMAGE_ENDPOINT);
     // Validate that at least one API key is provided
     if (!chatApiKey && !embeddingsApiKey && !imageApiKey) {
         throw createValidationError("At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.", "apiKeys", "[REDACTED]");
@@ -204,11 +263,16 @@ function validateChatModel(model) {
         throw createValidationError("Model must be a non-empty string", "model", model);
     }
     const supportedChatModels = [
-        "claude-4-sonnet",
-        "claude-3-haiku",
-        "claude-4-sonnet",
-        "claude-3-7-sonnet",
         "claude-3-5-haiku",
+        "claude-3-5-sonnet-latest",
+        "claude-3-7-sonnet",
+        "claude-3-haiku",
+        "claude-4-5-haiku",
+        "claude-4-5-sonnet",
+        "claude-4-sonnet",
+        "gpt-oss-120b",
+        "nova-lite",
+        "nova-pro",
     ];
     if (!supportedChatModels.includes(model)) {
         throw createValidationError(`Unsupported chat model '${model}'. Supported models: ${supportedChatModels.join(", ")}`, "model", model);
@@ -244,9 +308,20 @@ function validateImageModel(model) {
     }
 }
 /**
- * Default Heroku AI provider instance that reads credentials from environment variables.
+ * Default Heroku AI provider instance that lazily reads credentials from environment variables.
+ *
+ * This proxy defers calling {@link createHerokuAI} until the first property access,
+ * which keeps browser environments safe because `process.env` is only touched at runtime.
  */
-export const heroku = createHerokuAI();
+let _heroku = null;
+export const heroku = new Proxy({}, {
+    get(_, prop) {
+        if (!_heroku) {
+            _heroku = createHerokuAI();
+        }
+        return _heroku[prop];
+    },
+});
 /**
  * @deprecated Use {@link createHerokuAI} instead.
  */

@@ -20,6 +20,66 @@ function getEnvVar(key: string): string | undefined {
 }
 
 /**
+ * Ensures the base URL has the correct API endpoint path appended.
+ * The environment variables typically only provide the domain (e.g., https://us.inference.heroku.com)
+ * without the full path, so we need to append the appropriate endpoint.
+ *
+ * This function handles:
+ * - Base domain only: https://us.inference.heroku.com → appends path
+ * - Already has full path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Trailing slashes: normalizes them to prevent double slashes
+ *
+ * @internal
+ */
+export function ensureEndpointPath(
+  baseUrl: string,
+  endpointPath: string,
+): string {
+  if (!baseUrl) {
+    return baseUrl;
+  }
+
+  // Remove trailing slash from base URL for consistent handling
+  const normalizedBase = baseUrl.replace(/\/+$/, "");
+
+  // Normalize the endpoint path to ensure it starts with /
+  const normalizedEndpoint = endpointPath.startsWith("/")
+    ? endpointPath
+    : `/${endpointPath}`;
+
+  // Check if the URL already ends with the endpoint path (with or without trailing slash)
+  // This prevents double paths like /v1/chat/completions/v1/chat/completions
+  if (normalizedBase.endsWith(normalizedEndpoint)) {
+    return normalizedBase;
+  }
+
+  // Also check if the endpoint path is already present (handles cases with trailing content)
+  // Use a regex to match the endpoint at the end of the path portion
+  try {
+    const url = new URL(normalizedBase);
+    const pathname = url.pathname.replace(/\/+$/, "");
+
+    // If pathname already ends with the endpoint, return normalized base
+    if (pathname.endsWith(normalizedEndpoint)) {
+      return normalizedBase;
+    }
+
+    // If pathname contains the full endpoint path, return as-is
+    if (pathname.includes(normalizedEndpoint)) {
+      return normalizedBase;
+    }
+  } catch {
+    // If URL parsing fails, fall back to simple string check
+    if (normalizedBase.includes(normalizedEndpoint)) {
+      return normalizedBase;
+    }
+  }
+
+  // Append the endpoint path
+  return `${normalizedBase}${normalizedEndpoint}`;
+}
+
+/**
  * Configuration settings for the Heroku AI provider.
  *
  * @example
@@ -136,23 +196,39 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     options.imageApiKey ??
     getEnvVar("DIFFUSION_KEY") ??
     getEnvVar("HEROKU_DIFFUSION_KEY");
-  const chatBaseUrl =
+
+  // Get base URLs from options or environment, then ensure proper endpoint paths
+  // Environment variables typically only provide the domain without the API path
+  const CHAT_ENDPOINT = "/v1/chat/completions";
+  const EMBEDDINGS_ENDPOINT = "/v1/embeddings";
+  const IMAGE_ENDPOINT = "/v1/images/generations";
+  const DEFAULT_BASE_URL = "https://us.inference.heroku.com";
+
+  const rawChatBaseUrl =
     options.chatBaseUrl ??
     getEnvVar("INFERENCE_URL") ??
     getEnvVar("HEROKU_INFERENCE_URL") ??
-    "https://us.inference.heroku.com/v1/chat/completions";
-  const embeddingsBaseUrl =
+    DEFAULT_BASE_URL;
+  const chatBaseUrl = ensureEndpointPath(rawChatBaseUrl, CHAT_ENDPOINT);
+
+  const rawEmbeddingsBaseUrl =
     options.embeddingsBaseUrl ??
     getEnvVar("EMBEDDING_URL") ??
     getEnvVar("HEROKU_EMBEDDING_URL") ??
-    "https://us.inference.heroku.com/v1/embeddings";
-  const imageBaseUrl =
+    DEFAULT_BASE_URL;
+  const embeddingsBaseUrl = ensureEndpointPath(
+    rawEmbeddingsBaseUrl,
+    EMBEDDINGS_ENDPOINT,
+  );
+
+  const rawImageBaseUrl =
     options.imageBaseUrl ??
     getEnvVar("DIFFUSION_URL") ??
     getEnvVar("HEROKU_DIFFUSION_URL") ??
     getEnvVar("IMAGES_URL") ??
     getEnvVar("HEROKU_IMAGES_URL") ??
-    "https://us.inference.heroku.com/v1/images/generations";
+    DEFAULT_BASE_URL;
+  const imageBaseUrl = ensureEndpointPath(rawImageBaseUrl, IMAGE_ENDPOINT);
 
   // Validate that at least one API key is provided
   if (!chatApiKey && !embeddingsApiKey && !imageApiKey) {
@@ -327,11 +403,16 @@ function validateChatModel(model: string): void {
   }
 
   const supportedChatModels = [
-    "claude-4-sonnet",
-    "claude-3-haiku",
-    "claude-4-sonnet",
-    "claude-3-7-sonnet",
     "claude-3-5-haiku",
+    "claude-3-5-sonnet-latest",
+    "claude-3-7-sonnet",
+    "claude-3-haiku",
+    "claude-4-5-haiku",
+    "claude-4-5-sonnet",
+    "claude-4-sonnet",
+    "gpt-oss-120b",
+    "nova-lite",
+    "nova-pro",
   ];
 
   if (!supportedChatModels.includes(model)) {
