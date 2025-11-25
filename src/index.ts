@@ -400,9 +400,21 @@ function validateImageModel(model: string): void {
 }
 
 /**
- * Default Heroku AI provider instance that reads credentials from environment variables.
+ * Default Heroku AI provider instance that lazily reads credentials from environment variables.
+ *
+ * This proxy defers calling {@link createHerokuAI} until the first property access,
+ * which keeps browser environments safe because `process.env` is only touched at runtime.
  */
-export const heroku = createHerokuAI();
+let _heroku: ReturnType<typeof createHerokuAI> | null = null;
+export const heroku = new Proxy({} as ReturnType<typeof createHerokuAI>, {
+  get(_, prop) {
+    if (!_heroku) {
+      _heroku = createHerokuAI();
+    }
+
+    return (_heroku as Record<PropertyKey, unknown>)[prop as PropertyKey];
+  },
+});
 
 /**
  * @deprecated Use {@link createHerokuAI} instead.
