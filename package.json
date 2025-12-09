@@ -1,6 +1,6 @@
 {
   "name": "heroku-ai-provider",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "Heroku Managed Inference and Agents provider for the Vercel AI SDK",
   "type": "module",
   "author": "Julián Duque <jduque@heroku.com>",
