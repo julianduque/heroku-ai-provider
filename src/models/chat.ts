@@ -25,6 +25,10 @@ import {
 } from "@ai-sdk/provider-utils";
 import { makeHerokuRequest, processHerokuStream } from "../utils/api-client.js";
 import { createValidationError } from "../utils/error-handling.js";
+import {
+  SUPPORTED_CHAT_MODELS,
+  getSupportedChatModelsString,
+} from "../utils/supported-models.js";
 
 // Define more specific types for better type safety
 interface HerokuMessage {
@@ -336,22 +340,9 @@ export class HerokuChatLanguageModel implements LanguageModelV2 {
     }
 
     // Validate against Heroku's supported chat completion models
-    const supportedHerokuChatModels = [
-      "claude-4-sonnet",
-      "claude-3-haiku",
-      "claude-4-sonnet",
-      "claude-4-5-sonnet",
-      "claude-3-7-sonnet",
-      "claude-3-5-haiku",
-      "claude-3-5-sonnet-latest",
-      "gpt-oss-120b",
-      "nova-lite",
-      "nova-pro",
-    ];
-
-    if (!supportedHerokuChatModels.includes(model)) {
+    if (!SUPPORTED_CHAT_MODELS.includes(model)) {
       throw createValidationError(
-        `Unsupported chat model '${model}'. Supported models: ${supportedHerokuChatModels.join(", ")}`,
+        `Unsupported chat model '${model}'. Supported models: ${getSupportedChatModelsString()}`,
         "model",
         model,
       );
@@ -1474,9 +1465,9 @@ export class HerokuChatLanguageModel implements LanguageModelV2 {
         .filter((part): part is { type: string; text?: unknown } =>
           Boolean(
             part &&
-              typeof part === "object" &&
-              "type" in part &&
-              (part as Record<string, unknown>).type === "text",
+            typeof part === "object" &&
+            "type" in part &&
+            (part as Record<string, unknown>).type === "text",
           ),
         )
         .map((part) => {
@@ -1574,7 +1565,7 @@ export class HerokuChatLanguageModel implements LanguageModelV2 {
       "responseFormat",
       Boolean(
         options.responseFormat &&
-          !this.isSupportedResponseFormat(options.responseFormat),
+        !this.isSupportedResponseFormat(options.responseFormat),
       ),
       "Unsupported responseFormat configuration for Heroku chat models.",
     );
@@ -1597,7 +1588,7 @@ export class HerokuChatLanguageModel implements LanguageModelV2 {
       "providerOptions",
       Boolean(
         options.providerOptions &&
-          Object.keys(options.providerOptions).length > 0,
+        Object.keys(options.providerOptions).length > 0,
       ),
       "Provider-specific options are not supported.",
     );

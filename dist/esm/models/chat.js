@@ -2,6 +2,7 @@ import { APICallError, } from "@ai-sdk/provider";
 import { loadApiKey, withoutTrailingSlash, safeParseJSON, getErrorMessage, generateId, } from "@ai-sdk/provider-utils";
 import { makeHerokuRequest, processHerokuStream } from "../utils/api-client.js";
 import { createValidationError } from "../utils/error-handling.js";
+import { SUPPORTED_CHAT_MODELS, getSupportedChatModelsString, } from "../utils/supported-models.js";
 /**
  * Heroku chat language model implementation compatible with AI SDK v5.
  *
@@ -179,20 +180,8 @@ export class HerokuChatLanguageModel {
             throw urlError;
         }
         // Validate against Heroku's supported chat completion models
-        const supportedHerokuChatModels = [
-            "claude-4-sonnet",
-            "claude-3-haiku",
-            "claude-4-sonnet",
-            "claude-4-5-sonnet",
-            "claude-3-7-sonnet",
-            "claude-3-5-haiku",
-            "claude-3-5-sonnet-latest",
-            "gpt-oss-120b",
-            "nova-lite",
-            "nova-pro",
-        ];
-        if (!supportedHerokuChatModels.includes(model)) {
-            throw createValidationError(`Unsupported chat model '${model}'. Supported models: ${supportedHerokuChatModels.join(", ")}`, "model", model);
+        if (!SUPPORTED_CHAT_MODELS.includes(model)) {
+            throw createValidationError(`Unsupported chat model '${model}'. Supported models: ${getSupportedChatModelsString()}`, "model", model);
         }
     }
     /**

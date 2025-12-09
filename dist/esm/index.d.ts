@@ -230,4 +230,5 @@ export { HerokuImageModel } from "./models/image.js";
 export type { EmbeddingOptions } from "./models/embedding.js";
 export { createUserFriendlyError, formatUserFriendlyError, createSimpleErrorMessage, createDetailedErrorReport, isConfigurationError, isTemporaryServiceError, getContextualHelp, type UserFriendlyError, } from "./utils/user-friendly-errors.js";
 export { HerokuErrorType, ErrorSeverity, ErrorCategory, type HerokuErrorResponse, type ErrorMetadata, } from "./utils/error-types.js";
+export { SUPPORTED_CHAT_MODELS, SUPPORTED_EMBEDDING_MODELS, SUPPORTED_IMAGE_MODELS, fetchAvailableModels, getSupportedChatModels, getSupportedEmbeddingModels, getSupportedImageModels, isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, type HerokuModelInfo, type HerokuModelType, } from "./utils/supported-models.js";
 //# sourceMappingURL=index.d.ts.map

@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.HerokuImageModel = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
+exports.isSupportedImageModel = exports.isSupportedEmbeddingModel = exports.isSupportedChatModel = exports.getSupportedImageModels = exports.getSupportedEmbeddingModels = exports.getSupportedChatModels = exports.fetchAvailableModels = exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.HerokuImageModel = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
 exports.ensureEndpointPath = ensureEndpointPath;
 exports.createHerokuAI = createHerokuAI;
 const chat_js_1 = require('./models/chat.cjs');
 const embedding_js_1 = require('./models/embedding.cjs');
 const image_js_1 = require('./models/image.cjs');
 const error_handling_js_1 = require('./utils/error-handling.cjs');
+const supported_models_js_1 = require('./utils/supported-models.cjs');
 /**
  * Safely access environment variables in both Node.js and browser environments.
  * In browsers, process.env may not be available, so this function handles that gracefully.
@@ -267,20 +268,8 @@ function validateChatModel(model) {
     if (!model || typeof model !== "string") {
         throw (0, error_handling_js_1.createValidationError)("Model must be a non-empty string", "model", model);
     }
-    const supportedChatModels = [
-        "claude-3-5-haiku",
-        "claude-3-5-sonnet-latest",
-        "claude-3-7-sonnet",
-        "claude-3-haiku",
-        "claude-4-5-haiku",
-        "claude-4-5-sonnet",
-        "claude-4-sonnet",
-        "gpt-oss-120b",
-        "nova-lite",
-        "nova-pro",
-    ];
-    if (!supportedChatModels.includes(model)) {
-        throw (0, error_handling_js_1.createValidationError)(`Unsupported chat model '${model}'. Supported models: ${supportedChatModels.join(", ")}`, "model", model);
+    if (!(0, supported_models_js_1.isSupportedChatModel)(model)) {
+        throw (0, error_handling_js_1.createValidationError)(`Unsupported chat model '${model}'. Supported models: ${(0, supported_models_js_1.getSupportedChatModelsString)()}`, "model", model);
     }
 }
 /**
@@ -291,9 +280,8 @@ function validateEmbeddingModel(model) {
     if (!model || typeof model !== "string") {
         throw (0, error_handling_js_1.createValidationError)("Model must be a non-empty string", "model", model);
     }
-    const supportedEmbeddingModels = ["cohere-embed-multilingual"];
-    if (!supportedEmbeddingModels.includes(model)) {
-        throw (0, error_handling_js_1.createValidationError)(`Unsupported embedding model '${model}'. Supported models: ${supportedEmbeddingModels.join(", ")}`, "model", model);
+    if (!(0, supported_models_js_1.isSupportedEmbeddingModel)(model)) {
+        throw (0, error_handling_js_1.createValidationError)(`Unsupported embedding model '${model}'. Supported models: ${(0, supported_models_js_1.getSupportedEmbeddingModelsString)()}`, "model", model);
     }
 }
 /**
@@ -307,9 +295,8 @@ function validateImageModel(model) {
     if (model.trim().length === 0) {
         throw (0, error_handling_js_1.createValidationError)("Model cannot be empty or whitespace", "model", model);
     }
-    const supportedImageModels = ["stable-image-ultra"];
-    if (!supportedImageModels.includes(model)) {
-        throw (0, error_handling_js_1.createValidationError)(`Unsupported image model '${model}'. Supported models: ${supportedImageModels.join(", ")}`, "model", model);
+    if (!(0, supported_models_js_1.isSupportedImageModel)(model)) {
+        throw (0, error_handling_js_1.createValidationError)(`Unsupported image model '${model}'. Supported models: ${(0, supported_models_js_1.getSupportedImageModelsString)()}`, "model", model);
     }
 }
 /**
@@ -352,4 +339,16 @@ var error_types_js_1 = require('./utils/error-types.cjs');
 Object.defineProperty(exports, "HerokuErrorType", { enumerable: true, get: function () { return error_types_js_1.HerokuErrorType; } });
 Object.defineProperty(exports, "ErrorSeverity", { enumerable: true, get: function () { return error_types_js_1.ErrorSeverity; } });
 Object.defineProperty(exports, "ErrorCategory", { enumerable: true, get: function () { return error_types_js_1.ErrorCategory; } });
+// Export supported models utilities
+var supported_models_js_2 = require('./utils/supported-models.cjs');
+Object.defineProperty(exports, "SUPPORTED_CHAT_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_CHAT_MODELS; } });
+Object.defineProperty(exports, "SUPPORTED_EMBEDDING_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_EMBEDDING_MODELS; } });
+Object.defineProperty(exports, "SUPPORTED_IMAGE_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_IMAGE_MODELS; } });
+Object.defineProperty(exports, "fetchAvailableModels", { enumerable: true, get: function () { return supported_models_js_2.fetchAvailableModels; } });
+Object.defineProperty(exports, "getSupportedChatModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedChatModels; } });
+Object.defineProperty(exports, "getSupportedEmbeddingModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedEmbeddingModels; } });
+Object.defineProperty(exports, "getSupportedImageModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedImageModels; } });
+Object.defineProperty(exports, "isSupportedChatModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedChatModel; } });
+Object.defineProperty(exports, "isSupportedEmbeddingModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedEmbeddingModel; } });
+Object.defineProperty(exports, "isSupportedImageModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedImageModel; } });
 //# sourceMappingURL=index.js.map

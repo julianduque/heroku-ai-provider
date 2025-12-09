@@ -2,6 +2,14 @@ import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
 import { HerokuImageModel } from "./models/image.js";
 import { createValidationError } from "./utils/error-handling.js";
+import {
+  isSupportedChatModel,
+  isSupportedEmbeddingModel,
+  isSupportedImageModel,
+  getSupportedChatModelsString,
+  getSupportedEmbeddingModelsString,
+  getSupportedImageModelsString,
+} from "./utils/supported-models.js";
 
 /**
  * Safely access environment variables in both Node.js and browser environments.
@@ -402,22 +410,9 @@ function validateChatModel(model: string): void {
     );
   }
 
-  const supportedChatModels = [
-    "claude-3-5-haiku",
-    "claude-3-5-sonnet-latest",
-    "claude-3-7-sonnet",
-    "claude-3-haiku",
-    "claude-4-5-haiku",
-    "claude-4-5-sonnet",
-    "claude-4-sonnet",
-    "gpt-oss-120b",
-    "nova-lite",
-    "nova-pro",
-  ];
-
-  if (!supportedChatModels.includes(model)) {
+  if (!isSupportedChatModel(model)) {
     throw createValidationError(
-      `Unsupported chat model '${model}'. Supported models: ${supportedChatModels.join(", ")}`,
+      `Unsupported chat model '${model}'. Supported models: ${getSupportedChatModelsString()}`,
       "model",
       model,
     );
@@ -437,11 +432,9 @@ function validateEmbeddingModel(model: string): void {
     );
   }
 
-  const supportedEmbeddingModels = ["cohere-embed-multilingual"];
-
-  if (!supportedEmbeddingModels.includes(model)) {
+  if (!isSupportedEmbeddingModel(model)) {
     throw createValidationError(
-      `Unsupported embedding model '${model}'. Supported models: ${supportedEmbeddingModels.join(", ")}`,
+      `Unsupported embedding model '${model}'. Supported models: ${getSupportedEmbeddingModelsString()}`,
       "model",
       model,
     );
@@ -469,11 +462,9 @@ function validateImageModel(model: string): void {
     );
   }
 
-  const supportedImageModels = ["stable-image-ultra"];
-
-  if (!supportedImageModels.includes(model)) {
+  if (!isSupportedImageModel(model)) {
     throw createValidationError(
-      `Unsupported image model '${model}'. Supported models: ${supportedImageModels.join(", ")}`,
+      `Unsupported image model '${model}'. Supported models: ${getSupportedImageModelsString()}`,
       "model",
       model,
     );
@@ -530,3 +521,19 @@ export {
   type HerokuErrorResponse,
   type ErrorMetadata,
 } from "./utils/error-types.js";
+
+// Export supported models utilities
+export {
+  SUPPORTED_CHAT_MODELS,
+  SUPPORTED_EMBEDDING_MODELS,
+  SUPPORTED_IMAGE_MODELS,
+  fetchAvailableModels,
+  getSupportedChatModels,
+  getSupportedEmbeddingModels,
+  getSupportedImageModels,
+  isSupportedChatModel,
+  isSupportedEmbeddingModel,
+  isSupportedImageModel,
+  type HerokuModelInfo,
+  type HerokuModelType,
+} from "./utils/supported-models.js";

@@ -5,6 +5,7 @@ const provider_1 = require("@ai-sdk/provider");
 const provider_utils_1 = require("@ai-sdk/provider-utils");
 const api_client_js_1 = require('../utils/api-client.cjs');
 const error_handling_js_1 = require('../utils/error-handling.cjs');
+const supported_models_js_1 = require('../utils/supported-models.cjs');
 /**
  * Heroku chat language model implementation compatible with AI SDK v5.
  *
@@ -182,20 +183,8 @@ class HerokuChatLanguageModel {
             throw urlError;
         }
         // Validate against Heroku's supported chat completion models
-        const supportedHerokuChatModels = [
-            "claude-4-sonnet",
-            "claude-3-haiku",
-            "claude-4-sonnet",
-            "claude-4-5-sonnet",
-            "claude-3-7-sonnet",
-            "claude-3-5-haiku",
-            "claude-3-5-sonnet-latest",
-            "gpt-oss-120b",
-            "nova-lite",
-            "nova-pro",
-        ];
-        if (!supportedHerokuChatModels.includes(model)) {
-            throw (0, error_handling_js_1.createValidationError)(`Unsupported chat model '${model}'. Supported models: ${supportedHerokuChatModels.join(", ")}`, "model", model);
+        if (!supported_models_js_1.SUPPORTED_CHAT_MODELS.includes(model)) {
+            throw (0, error_handling_js_1.createValidationError)(`Unsupported chat model '${model}'. Supported models: ${(0, supported_models_js_1.getSupportedChatModelsString)()}`, "model", model);
         }
     }
     /**

@@ -2,6 +2,7 @@ import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
 import { HerokuImageModel } from "./models/image.js";
 import { createValidationError } from "./utils/error-handling.js";
+import { isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, getSupportedChatModelsString, getSupportedEmbeddingModelsString, getSupportedImageModelsString, } from "./utils/supported-models.js";
 /**
  * Safely access environment variables in both Node.js and browser environments.
  * In browsers, process.env may not be available, so this function handles that gracefully.
@@ -262,20 +263,8 @@ function validateChatModel(model) {
     if (!model || typeof model !== "string") {
         throw createValidationError("Model must be a non-empty string", "model", model);
     }
-    const supportedChatModels = [
-        "claude-3-5-haiku",
-        "claude-3-5-sonnet-latest",
-        "claude-3-7-sonnet",
-        "claude-3-haiku",
-        "claude-4-5-haiku",
-        "claude-4-5-sonnet",
-        "claude-4-sonnet",
-        "gpt-oss-120b",
-        "nova-lite",
-        "nova-pro",
-    ];
-    if (!supportedChatModels.includes(model)) {
-        throw createValidationError(`Unsupported chat model '${model}'. Supported models: ${supportedChatModels.join(", ")}`, "model", model);
+    if (!isSupportedChatModel(model)) {
+        throw createValidationError(`Unsupported chat model '${model}'. Supported models: ${getSupportedChatModelsString()}`, "model", model);
     }
 }
 /**
@@ -286,9 +275,8 @@ function validateEmbeddingModel(model) {
     if (!model || typeof model !== "string") {
         throw createValidationError("Model must be a non-empty string", "model", model);
     }
-    const supportedEmbeddingModels = ["cohere-embed-multilingual"];
-    if (!supportedEmbeddingModels.includes(model)) {
-        throw createValidationError(`Unsupported embedding model '${model}'. Supported models: ${supportedEmbeddingModels.join(", ")}`, "model", model);
+    if (!isSupportedEmbeddingModel(model)) {
+        throw createValidationError(`Unsupported embedding model '${model}'. Supported models: ${getSupportedEmbeddingModelsString()}`, "model", model);
     }
 }
 /**
@@ -302,9 +290,8 @@ function validateImageModel(model) {
     if (model.trim().length === 0) {
         throw createValidationError("Model cannot be empty or whitespace", "model", model);
     }
-    const supportedImageModels = ["stable-image-ultra"];
-    if (!supportedImageModels.includes(model)) {
-        throw createValidationError(`Unsupported image model '${model}'. Supported models: ${supportedImageModels.join(", ")}`, "model", model);
+    if (!isSupportedImageModel(model)) {
+        throw createValidationError(`Unsupported image model '${model}'. Supported models: ${getSupportedImageModelsString()}`, "model", model);
     }
 }
 /**
@@ -333,4 +320,6 @@ export { HerokuImageModel } from "./models/image.js";
 // Export error handling utilities
 export { createUserFriendlyError, formatUserFriendlyError, createSimpleErrorMessage, createDetailedErrorReport, isConfigurationError, isTemporaryServiceError, getContextualHelp, } from "./utils/user-friendly-errors.js";
 export { HerokuErrorType, ErrorSeverity, ErrorCategory, } from "./utils/error-types.js";
+// Export supported models utilities
+export { SUPPORTED_CHAT_MODELS, SUPPORTED_EMBEDDING_MODELS, SUPPORTED_IMAGE_MODELS, fetchAvailableModels, getSupportedChatModels, getSupportedEmbeddingModels, getSupportedImageModels, isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, } from "./utils/supported-models.js";
 //# sourceMappingURL=index.js.map
