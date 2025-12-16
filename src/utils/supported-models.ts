@@ -45,9 +45,17 @@ export const SUPPORTED_CHAT_MODELS: readonly string[] = Object.freeze([
   "claude-4-5-haiku",
   "claude-4-5-sonnet",
   "claude-4-sonnet",
+  "claude-opus-4-5",
   "gpt-oss-120b",
+  "kimi-k2-thinking",
+  "minimax-m2",
+  "nova-2-lite",
+  "nova-2-omni",
+  "nova-2-pro",
   "nova-lite",
   "nova-pro",
+  "qwen3-235b",
+  "qwen3-coder-480b",
 ]);
 
 /**
