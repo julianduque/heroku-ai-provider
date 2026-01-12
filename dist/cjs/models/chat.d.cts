@@ -1,5 +1,5 @@
-import { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2CallWarning, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2FunctionTool, LanguageModelV2ProviderDefinedTool, LanguageModelV2StreamPart, LanguageModelV2ToolChoice, LanguageModelV2Usage } from "@ai-sdk/provider";
-export type ToolInput = LanguageModelV2FunctionTool | LanguageModelV2ProviderDefinedTool;
+import { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2CallWarning, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2FunctionTool, LanguageModelV2ProviderTool, LanguageModelV2StreamPart, LanguageModelV2ToolChoice, LanguageModelV2Usage } from "@ai-sdk/provider";
+export type ToolInput = LanguageModelV2FunctionTool | LanguageModelV2ProviderTool;
 export type ToolChoiceInput = LanguageModelV2ToolChoice | "auto" | "none" | "required" | string;
 /**
  * Heroku chat language model implementation compatible with AI SDK v5.

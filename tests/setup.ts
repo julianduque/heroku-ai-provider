@@ -11,11 +11,11 @@ global.console = {
   // error: jest.fn(),
 };
 
-// Global test timeout
-jest.setTimeout(10000);
+// Global test timeout (longer for integration tests with real API calls)
+jest.setTimeout(30000);
 
-// Mock fetch globally if needed
-global.fetch = jest.fn();
+// Note: fetch is NOT mocked globally to allow integration tests to make real API calls.
+// Tests that need to mock fetch should set up their own mocks.
 
 // Reset all mocks after each test
 afterEach(() => {

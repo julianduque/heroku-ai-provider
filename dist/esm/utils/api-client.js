@@ -1,4 +1,5 @@
 import { mapHerokuError, mapNetworkError, mapStreamError, shouldRetryError, getRetryDelay, createValidationError, } from "./error-handling.js";
+import { APICallError } from "@ai-sdk/provider";
 /**
  * Default configuration for API requests
  */
@@ -7,6 +8,7 @@ const DEFAULT_OPTIONS = {
     timeout: 30000, // 30 seconds
     stream: false,
     headers: {},
+    abortSignal: undefined,
 };
 /**
  * Enhanced Heroku API client with comprehensive error handling and retry logic
@@ -61,9 +63,21 @@ async function executeRequest(url, apiKey, body, config, attempt) {
         "X-Request-Attempt": attempt.toString(),
         ...config.headers,
     };
+    // Check if already aborted before starting
+    if (config.abortSignal?.aborted) {
+        throw new APICallError({
+            message: "Request was aborted",
+            url,
+            requestBodyValues: body,
+            statusCode: 499,
+        });
+    }
     // Create AbortController for timeout handling
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+    // If an external signal is provided, abort our controller when it aborts
+    const externalAbortHandler = () => controller.abort();
+    config.abortSignal?.addEventListener("abort", externalAbortHandler);
     try {
         const response = await fetch(url, {
             method: "POST",
@@ -72,6 +86,7 @@ async function executeRequest(url, apiKey, body, config, attempt) {
             signal: controller.signal,
         });
         clearTimeout(timeoutId);
+        config.abortSignal?.removeEventListener("abort", externalAbortHandler);
         if (!response.ok) {
             const errorData = await response.json().catch(() => null);
             throw mapHerokuError(response.status, errorData, url, body);
@@ -80,9 +95,19 @@ async function executeRequest(url, apiKey, body, config, attempt) {
     }
     catch (error) {
         clearTimeout(timeoutId);
+        config.abortSignal?.removeEventListener("abort", externalAbortHandler);
         // Handle different types of errors
         if (error instanceof Error) {
             if (error.name === "AbortError") {
+                // Check if it was an external abort or a timeout
+                if (config.abortSignal?.aborted) {
+                    throw new APICallError({
+                        message: "Request was aborted",
+                        url,
+                        requestBodyValues: body,
+                        statusCode: 499,
+                    });
+                }
                 throw mapNetworkError(new Error(`Request timeout after ${config.timeout}ms`), url, body);
             }
             if (isNetworkError(error)) {

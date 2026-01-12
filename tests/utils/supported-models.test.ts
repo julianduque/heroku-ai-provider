@@ -2,16 +2,20 @@ import {
   SUPPORTED_CHAT_MODELS,
   SUPPORTED_EMBEDDING_MODELS,
   SUPPORTED_IMAGE_MODELS,
+  SUPPORTED_RERANKING_MODELS,
   isSupportedChatModel,
   isSupportedEmbeddingModel,
   isSupportedImageModel,
+  isSupportedRerankingModel,
   getSupportedChatModelsString,
   getSupportedEmbeddingModelsString,
   getSupportedImageModelsString,
+  getSupportedRerankingModelsString,
   fetchAvailableModels,
   getSupportedChatModels,
   getSupportedEmbeddingModels,
   getSupportedImageModels,
+  getSupportedRerankingModels,
   clearModelCache,
 } from "../../src/utils/supported-models";
 
@@ -66,6 +70,29 @@ describe("Supported Models Module", () => {
     });
   });
 
+  describe("SUPPORTED_RERANKING_MODELS", () => {
+    it("should be a non-empty frozen array", () => {
+      expect(Array.isArray(SUPPORTED_RERANKING_MODELS)).toBe(true);
+      expect(SUPPORTED_RERANKING_MODELS.length).toBeGreaterThan(0);
+      expect(Object.isFrozen(SUPPORTED_RERANKING_MODELS)).toBe(true);
+    });
+
+    it("should contain cohere-rerank-3-5", () => {
+      expect(SUPPORTED_RERANKING_MODELS).toContain("cohere-rerank-3-5");
+    });
+
+    it("should contain amazon-rerank-1-0", () => {
+      expect(SUPPORTED_RERANKING_MODELS).toContain("amazon-rerank-1-0");
+    });
+
+    it("should not contain chat or embedding models", () => {
+      expect(SUPPORTED_RERANKING_MODELS).not.toContain("claude-4-sonnet");
+      expect(SUPPORTED_RERANKING_MODELS).not.toContain(
+        "cohere-embed-multilingual",
+      );
+    });
+  });
+
   describe("isSupportedChatModel", () => {
     it("should return true for supported chat models", () => {
       expect(isSupportedChatModel("claude-4-sonnet")).toBe(true);
@@ -102,6 +129,21 @@ describe("Supported Models Module", () => {
     });
   });
 
+  describe("isSupportedRerankingModel", () => {
+    it("should return true for supported reranking models", () => {
+      expect(isSupportedRerankingModel("cohere-rerank-3-5")).toBe(true);
+      expect(isSupportedRerankingModel("amazon-rerank-1-0")).toBe(true);
+    });
+
+    it("should return false for unsupported models", () => {
+      expect(isSupportedRerankingModel("unknown-model")).toBe(false);
+      expect(isSupportedRerankingModel("claude-4-sonnet")).toBe(false);
+      expect(isSupportedRerankingModel("cohere-embed-multilingual")).toBe(
+        false,
+      );
+    });
+  });
+
   describe("getSupportedChatModelsString", () => {
     it("should return a comma-separated string of chat models", () => {
       const result = getSupportedChatModelsString();
@@ -124,6 +166,15 @@ describe("Supported Models Module", () => {
       const result = getSupportedImageModelsString();
       expect(typeof result).toBe("string");
       expect(result).toContain("stable-image-ultra");
+    });
+  });
+
+  describe("getSupportedRerankingModelsString", () => {
+    it("should return a string containing reranking models", () => {
+      const result = getSupportedRerankingModelsString();
+      expect(typeof result).toBe("string");
+      expect(result).toContain("cohere-rerank-3-5");
+      expect(result).toContain("amazon-rerank-1-0");
     });
   });
 
@@ -321,6 +372,42 @@ describe("Supported Models Module", () => {
 
       const result = await getSupportedImageModels({ timeout: 1000 });
       expect(result).toEqual([...SUPPORTED_IMAGE_MODELS]);
+    });
+  });
+
+  describe("getSupportedRerankingModels", () => {
+    const originalFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      clearModelCache();
+    });
+
+    it("should return fetched models when API succeeds", async () => {
+      const mockModels = [
+        { model_id: "chat-model", type: ["text-to-text"], regions: ["us"] },
+        {
+          model_id: "api-rerank-model",
+          type: ["text-to-ranking"],
+          regions: ["us"],
+        },
+      ];
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockModels),
+      });
+
+      const result = await getSupportedRerankingModels({ timeout: 1000 });
+      expect(result).toContain("api-rerank-model");
+      expect(result).not.toContain("chat-model");
+    });
+
+    it("should return fallback list when API fails", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
+
+      const result = await getSupportedRerankingModels({ timeout: 1000 });
+      expect(result).toEqual([...SUPPORTED_RERANKING_MODELS]);
     });
   });
 });

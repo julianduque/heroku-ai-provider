@@ -9,7 +9,7 @@ import {
   LanguageModelV2FinishReason,
   LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
-  LanguageModelV2ProviderDefinedTool,
+  LanguageModelV2ProviderTool,
   LanguageModelV2StreamPart,
   LanguageModelV2ToolCall,
   LanguageModelV2ToolChoice,
@@ -96,7 +96,7 @@ interface StructuredOutputConfig {
 // Type aliases for compatibility
 export type ToolInput =
   | LanguageModelV2FunctionTool
-  | LanguageModelV2ProviderDefinedTool;
+  | LanguageModelV2ProviderTool;
 export type ToolChoiceInput =
   | LanguageModelV2ToolChoice
   | "auto"

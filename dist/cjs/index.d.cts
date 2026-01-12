@@ -1,6 +1,7 @@
 import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
 import { HerokuImageModel } from "./models/image.js";
+import { HerokuRerankingModel } from "./models/reranking.js";
 /**
  * Ensures the base URL has the correct API endpoint path appended.
  * The environment variables typically only provide the domain (e.g., https://us.inference.heroku.com)
@@ -8,7 +9,8 @@ import { HerokuImageModel } from "./models/image.js";
  *
  * This function handles:
  * - Base domain only: https://us.inference.heroku.com → appends path
- * - Already has full path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Already has correct path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Different /v1/ path: https://us.inference.heroku.com/v1/chat/completions + /v1/rerank → strips and replaces
  * - Trailing slashes: normalizes them to prevent double slashes
  *
  * @internal
@@ -60,6 +62,18 @@ export interface HerokuAIOptions {
      * @default process.env.DIFFUSION_URL ?? "https://us.inference.heroku.com/v1/images/generations" (process.env only available in Node.js)
      */
     imageBaseUrl?: string;
+    /**
+     * API key for reranking.
+     * Falls back to INFERENCE_KEY since Heroku provisions rerank models under the inference service.
+     * @default process.env.INFERENCE_KEY ?? process.env.HEROKU_INFERENCE_KEY (Node.js only; not available in browsers)
+     */
+    rerankingApiKey?: string;
+    /**
+     * Base URL for reranking API.
+     * Falls back to INFERENCE_URL since Heroku provisions rerank models under the inference service.
+     * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/rerank" (process.env only available in Node.js)
+     */
+    rerankingBaseUrl?: string;
 }
 /**
  * @deprecated Use {@link HerokuAIOptions} instead.
@@ -160,6 +174,26 @@ export declare function createHerokuAI(options?: HerokuAIOptions): {
      * ```
      */
     image: (model: string) => HerokuImageModel;
+    /**
+     * Creates a reranking model instance for the specified Heroku model.
+     *
+     * @param model - The Heroku reranking model identifier
+     * @returns A HerokuRerankingModel instance compatible with AI SDK v6
+     *
+     * @throws {ValidationError} When the reranking API key is missing or the model identifier is invalid
+     *
+     * @example
+     * ```typescript
+     * const rerankingModel = heroku.reranking("cohere-rerank-3-5");
+     *
+     * const { ranking } = await rerank({
+     *   model: rerankingModel,
+     *   query: "How do I optimize database queries?",
+     *   documents: ["Use indexes", "Enable caching", "Monitor queries"]
+     * });
+     * ```
+     */
+    reranking: (model: string) => HerokuRerankingModel;
 };
 export declare const heroku: {
     /**
@@ -219,6 +253,26 @@ export declare const heroku: {
      * ```
      */
     image: (model: string) => HerokuImageModel;
+    /**
+     * Creates a reranking model instance for the specified Heroku model.
+     *
+     * @param model - The Heroku reranking model identifier
+     * @returns A HerokuRerankingModel instance compatible with AI SDK v6
+     *
+     * @throws {ValidationError} When the reranking API key is missing or the model identifier is invalid
+     *
+     * @example
+     * ```typescript
+     * const rerankingModel = heroku.reranking("cohere-rerank-3-5");
+     *
+     * const { ranking } = await rerank({
+     *   model: rerankingModel,
+     *   query: "How do I optimize database queries?",
+     *   documents: ["Use indexes", "Enable caching", "Monitor queries"]
+     * });
+     * ```
+     */
+    reranking: (model: string) => HerokuRerankingModel;
 };
 /**
  * @deprecated Use {@link createHerokuAI} instead.
@@ -227,8 +281,9 @@ export declare const createHerokuProvider: typeof createHerokuAI;
 export { HerokuChatLanguageModel } from "./models/chat.js";
 export { HerokuEmbeddingModel, createEmbedFunction, } from "./models/embedding.js";
 export { HerokuImageModel } from "./models/image.js";
+export { HerokuRerankingModel } from "./models/reranking.js";
 export type { EmbeddingOptions } from "./models/embedding.js";
 export { createUserFriendlyError, formatUserFriendlyError, createSimpleErrorMessage, createDetailedErrorReport, isConfigurationError, isTemporaryServiceError, getContextualHelp, type UserFriendlyError, } from "./utils/user-friendly-errors.js";
 export { HerokuErrorType, ErrorSeverity, ErrorCategory, type HerokuErrorResponse, type ErrorMetadata, } from "./utils/error-types.js";
-export { SUPPORTED_CHAT_MODELS, SUPPORTED_EMBEDDING_MODELS, SUPPORTED_IMAGE_MODELS, fetchAvailableModels, getSupportedChatModels, getSupportedEmbeddingModels, getSupportedImageModels, isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, type HerokuModelInfo, type HerokuModelType, } from "./utils/supported-models.js";
+export { SUPPORTED_CHAT_MODELS, SUPPORTED_EMBEDDING_MODELS, SUPPORTED_IMAGE_MODELS, SUPPORTED_RERANKING_MODELS, fetchAvailableModels, getSupportedChatModels, getSupportedEmbeddingModels, getSupportedImageModels, getSupportedRerankingModels, isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, isSupportedRerankingModel, type HerokuModelInfo, type HerokuModelType, } from "./utils/supported-models.js";
 //# sourceMappingURL=index.d.ts.map

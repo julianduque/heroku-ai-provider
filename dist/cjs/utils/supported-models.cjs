@@ -10,17 +10,20 @@
  * @module
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = void 0;
+exports.SUPPORTED_RERANKING_MODELS = exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = void 0;
 exports.fetchAvailableModels = fetchAvailableModels;
 exports.getSupportedChatModels = getSupportedChatModels;
 exports.getSupportedEmbeddingModels = getSupportedEmbeddingModels;
 exports.getSupportedImageModels = getSupportedImageModels;
+exports.getSupportedRerankingModels = getSupportedRerankingModels;
 exports.isSupportedChatModel = isSupportedChatModel;
 exports.isSupportedEmbeddingModel = isSupportedEmbeddingModel;
 exports.isSupportedImageModel = isSupportedImageModel;
+exports.isSupportedRerankingModel = isSupportedRerankingModel;
 exports.getSupportedChatModelsString = getSupportedChatModelsString;
 exports.getSupportedEmbeddingModelsString = getSupportedEmbeddingModelsString;
 exports.getSupportedImageModelsString = getSupportedImageModelsString;
+exports.getSupportedRerankingModelsString = getSupportedRerankingModelsString;
 exports.clearModelCache = clearModelCache;
 /**
  * URL for fetching available models from Heroku.
@@ -40,9 +43,17 @@ exports.SUPPORTED_CHAT_MODELS = Object.freeze([
     "claude-4-5-haiku",
     "claude-4-5-sonnet",
     "claude-4-sonnet",
+    "claude-opus-4-5",
     "gpt-oss-120b",
+    "kimi-k2-thinking",
+    "minimax-m2",
+    "nova-2-lite",
+    "nova-2-omni",
+    "nova-2-pro",
     "nova-lite",
     "nova-pro",
+    "qwen3-235b",
+    "qwen3-coder-480b",
 ]);
 /**
  * Static fallback list of supported embedding models (text-to-embedding).
@@ -55,6 +66,13 @@ exports.SUPPORTED_EMBEDDING_MODELS = Object.freeze([
  */
 exports.SUPPORTED_IMAGE_MODELS = Object.freeze([
     "stable-image-ultra",
+]);
+/**
+ * Static fallback list of supported reranking models (text-to-ranking).
+ */
+exports.SUPPORTED_RERANKING_MODELS = Object.freeze([
+    "cohere-rerank-3-5",
+    "amazon-rerank-1-0",
 ]);
 /**
  * Cache for dynamically fetched models with TTL.
@@ -184,6 +202,25 @@ async function getSupportedImageModels(options) {
     return [...exports.SUPPORTED_IMAGE_MODELS];
 }
 /**
+ * Gets the list of supported reranking models, attempting to fetch from API first.
+ *
+ * @param options - Options for fetching
+ * @returns Array of supported reranking model IDs
+ */
+async function getSupportedRerankingModels(options) {
+    const models = await fetchAvailableModels(options);
+    if (models) {
+        const rerankingModels = models
+            .filter((m) => m.type.includes("text-to-ranking"))
+            .map((m) => m.model_id);
+        if (rerankingModels.length > 0) {
+            return rerankingModels;
+        }
+    }
+    // Fallback to static list
+    return [...exports.SUPPORTED_RERANKING_MODELS];
+}
+/**
  * Synchronously checks if a model is a supported chat model.
  * Uses the static fallback list for immediate validation.
  *
@@ -221,6 +258,16 @@ function isSupportedImageModel(model) {
     return exports.SUPPORTED_IMAGE_MODELS.includes(model);
 }
 /**
+ * Synchronously checks if a model is a supported reranking model.
+ * Uses the static fallback list for immediate validation.
+ *
+ * @param model - Model ID to validate
+ * @returns true if the model is supported
+ */
+function isSupportedRerankingModel(model) {
+    return exports.SUPPORTED_RERANKING_MODELS.includes(model);
+}
+/**
  * Gets a formatted string of supported chat models for error messages.
  *
  * @returns Comma-separated list of supported models
@@ -243,6 +290,14 @@ function getSupportedEmbeddingModelsString() {
  */
 function getSupportedImageModelsString() {
     return exports.SUPPORTED_IMAGE_MODELS.join(", ");
+}
+/**
+ * Gets a formatted string of supported reranking models for error messages.
+ *
+ * @returns Comma-separated list of supported models
+ */
+function getSupportedRerankingModelsString() {
+    return exports.SUPPORTED_RERANKING_MODELS.join(", ");
 }
 /**
  * Clears the cached models (useful for testing).
