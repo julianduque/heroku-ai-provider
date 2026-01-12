@@ -87,3 +87,103 @@ describe("createHerokuAI image integration", () => {
     );
   });
 });
+
+describe("createHerokuAI reranking integration", () => {
+  const originalInferenceKey = process.env.INFERENCE_KEY;
+  const originalHerokuInferenceKey = process.env.HEROKU_INFERENCE_KEY;
+  const originalInferenceUrl = process.env.INFERENCE_URL;
+  const originalHerokuInferenceUrl = process.env.HEROKU_INFERENCE_URL;
+
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    if (originalInferenceKey) {
+      process.env.INFERENCE_KEY = originalInferenceKey;
+    } else {
+      delete process.env.INFERENCE_KEY;
+    }
+
+    if (originalHerokuInferenceKey) {
+      process.env.HEROKU_INFERENCE_KEY = originalHerokuInferenceKey;
+    } else {
+      delete process.env.HEROKU_INFERENCE_KEY;
+    }
+
+    if (originalInferenceUrl) {
+      process.env.INFERENCE_URL = originalInferenceUrl;
+    } else {
+      delete process.env.INFERENCE_URL;
+    }
+
+    if (originalHerokuInferenceUrl) {
+      process.env.HEROKU_INFERENCE_URL = originalHerokuInferenceUrl;
+    } else {
+      delete process.env.HEROKU_INFERENCE_URL;
+    }
+  });
+
+  it("returns a reranking model when using INFERENCE_KEY env var", async () => {
+    process.env.INFERENCE_KEY = "inference-key-for-rerank";
+    const { createHerokuAI } = await import("../src");
+
+    const provider = createHerokuAI();
+    const rerankingModel = provider.reranking("cohere-rerank-3-5");
+
+    expect(rerankingModel.provider).toBe("heroku");
+    expect(rerankingModel.modelId).toBe("cohere-rerank-3-5");
+  });
+
+  it("returns a reranking model when using HEROKU_INFERENCE_KEY env var", async () => {
+    delete process.env.INFERENCE_KEY;
+    process.env.HEROKU_INFERENCE_KEY = "heroku-inference-key-for-rerank";
+    const { createHerokuAI } = await import("../src");
+
+    const provider = createHerokuAI();
+    const rerankingModel = provider.reranking("amazon-rerank-1-0");
+
+    expect(rerankingModel.provider).toBe("heroku");
+    expect(rerankingModel.modelId).toBe("amazon-rerank-1-0");
+  });
+
+  it("uses rerankingApiKey option to override env vars", async () => {
+    process.env.INFERENCE_KEY = "env-inference-key";
+    const { createHerokuAI } = await import("../src");
+
+    const provider = createHerokuAI({
+      rerankingApiKey: "custom-rerank-api-key",
+    });
+    const rerankingModel = provider.reranking("cohere-rerank-3-5");
+
+    expect(rerankingModel.provider).toBe("heroku");
+    expect(rerankingModel.modelId).toBe("cohere-rerank-3-5");
+  });
+
+  it("throws when no reranking API key is available", async () => {
+    delete process.env.INFERENCE_KEY;
+    delete process.env.HEROKU_INFERENCE_KEY;
+    process.env.EMBEDDING_KEY = "bootstrap-embed";
+    const { createHerokuAI } = await import("../src");
+    delete process.env.EMBEDDING_KEY;
+
+    const provider = createHerokuAI({ embeddingsApiKey: "embed-key" });
+
+    expect(() => provider.reranking("cohere-rerank-3-5")).toThrow(
+      "Reranking API key is required",
+    );
+  });
+
+  it("uses INFERENCE_URL for reranking base URL", async () => {
+    process.env.INFERENCE_KEY = "inference-key";
+    process.env.INFERENCE_URL = "https://custom.inference.url";
+    const { createHerokuAI } = await import("../src");
+
+    const provider = createHerokuAI();
+    const rerankingModel = provider.reranking("cohere-rerank-3-5");
+
+    // The model should be created successfully with the custom URL
+    expect(rerankingModel.provider).toBe("heroku");
+    expect(rerankingModel.modelId).toBe("cohere-rerank-3-5");
+  });
+});

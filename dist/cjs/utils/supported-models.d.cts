@@ -19,7 +19,7 @@ export interface HerokuModelInfo {
 /**
  * Model type categories used by Heroku API.
  */
-export type HerokuModelType = "text-to-text" | "text-to-embedding" | "text-to-image";
+export type HerokuModelType = "text-to-text" | "text-to-embedding" | "text-to-image" | "text-to-ranking";
 /**
  * Static fallback list of supported chat models (text-to-text).
  * Used when the API is unavailable or for synchronous validation.
@@ -35,6 +35,10 @@ export declare const SUPPORTED_EMBEDDING_MODELS: readonly string[];
  * Static fallback list of supported image models (text-to-image).
  */
 export declare const SUPPORTED_IMAGE_MODELS: readonly string[];
+/**
+ * Static fallback list of supported reranking models (text-to-ranking).
+ */
+export declare const SUPPORTED_RERANKING_MODELS: readonly string[];
 /**
  * Fetches the list of available models from Heroku's API.
  *
@@ -93,6 +97,16 @@ export declare function getSupportedImageModels(options?: {
     useCache?: boolean;
 }): Promise<string[]>;
 /**
+ * Gets the list of supported reranking models, attempting to fetch from API first.
+ *
+ * @param options - Options for fetching
+ * @returns Array of supported reranking model IDs
+ */
+export declare function getSupportedRerankingModels(options?: {
+    timeout?: number;
+    useCache?: boolean;
+}): Promise<string[]>;
+/**
  * Synchronously checks if a model is a supported chat model.
  * Uses the static fallback list for immediate validation.
  *
@@ -124,6 +138,14 @@ export declare function isSupportedEmbeddingModel(model: string): boolean;
  */
 export declare function isSupportedImageModel(model: string): boolean;
 /**
+ * Synchronously checks if a model is a supported reranking model.
+ * Uses the static fallback list for immediate validation.
+ *
+ * @param model - Model ID to validate
+ * @returns true if the model is supported
+ */
+export declare function isSupportedRerankingModel(model: string): boolean;
+/**
  * Gets a formatted string of supported chat models for error messages.
  *
  * @returns Comma-separated list of supported models
@@ -141,6 +163,12 @@ export declare function getSupportedEmbeddingModelsString(): string;
  * @returns Comma-separated list of supported models
  */
 export declare function getSupportedImageModelsString(): string;
+/**
+ * Gets a formatted string of supported reranking models for error messages.
+ *
+ * @returns Comma-separated list of supported models
+ */
+export declare function getSupportedRerankingModelsString(): string;
 /**
  * Clears the cached models (useful for testing).
  * @internal

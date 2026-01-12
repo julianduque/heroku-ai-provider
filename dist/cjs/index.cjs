@@ -1,11 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isSupportedImageModel = exports.isSupportedEmbeddingModel = exports.isSupportedChatModel = exports.getSupportedImageModels = exports.getSupportedEmbeddingModels = exports.getSupportedChatModels = exports.fetchAvailableModels = exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.HerokuImageModel = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
+exports.isSupportedRerankingModel = exports.isSupportedImageModel = exports.isSupportedEmbeddingModel = exports.isSupportedChatModel = exports.getSupportedRerankingModels = exports.getSupportedImageModels = exports.getSupportedEmbeddingModels = exports.getSupportedChatModels = exports.fetchAvailableModels = exports.SUPPORTED_RERANKING_MODELS = exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = exports.ErrorCategory = exports.ErrorSeverity = exports.HerokuErrorType = exports.getContextualHelp = exports.isTemporaryServiceError = exports.isConfigurationError = exports.createDetailedErrorReport = exports.createSimpleErrorMessage = exports.formatUserFriendlyError = exports.createUserFriendlyError = exports.HerokuRerankingModel = exports.HerokuImageModel = exports.createEmbedFunction = exports.HerokuEmbeddingModel = exports.HerokuChatLanguageModel = exports.createHerokuProvider = exports.heroku = void 0;
 exports.ensureEndpointPath = ensureEndpointPath;
 exports.createHerokuAI = createHerokuAI;
 const chat_js_1 = require('./models/chat.cjs');
 const embedding_js_1 = require('./models/embedding.cjs');
 const image_js_1 = require('./models/image.cjs');
+const reranking_js_1 = require('./models/reranking.cjs');
 const error_handling_js_1 = require('./utils/error-handling.cjs');
 const supported_models_js_1 = require('./utils/supported-models.cjs');
 /**
@@ -28,7 +29,8 @@ function getEnvVar(key) {
  *
  * This function handles:
  * - Base domain only: https://us.inference.heroku.com → appends path
- * - Already has full path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Already has correct path: https://us.inference.heroku.com/v1/chat/completions → returns as-is
+ * - Different /v1/ path: https://us.inference.heroku.com/v1/chat/completions + /v1/rerank → strips and replaces
  * - Trailing slashes: normalizes them to prevent double slashes
  *
  * @internal
@@ -48,8 +50,7 @@ function ensureEndpointPath(baseUrl, endpointPath) {
     if (normalizedBase.endsWith(normalizedEndpoint)) {
         return normalizedBase;
     }
-    // Also check if the endpoint path is already present (handles cases with trailing content)
-    // Use a regex to match the endpoint at the end of the path portion
+    // Parse URL to handle path manipulation
     try {
         const url = new URL(normalizedBase);
         const pathname = url.pathname.replace(/\/+$/, "");
@@ -57,19 +58,31 @@ function ensureEndpointPath(baseUrl, endpointPath) {
         if (pathname.endsWith(normalizedEndpoint)) {
             return normalizedBase;
         }
-        // If pathname contains the full endpoint path, return as-is
-        if (pathname.includes(normalizedEndpoint)) {
-            return normalizedBase;
+        // If pathname already contains a /v1/ path (e.g., /v1/chat/completions),
+        // strip everything from /v1/ onwards and append the correct endpoint.
+        // This handles cases where INFERENCE_URL is a full endpoint but we need a different one.
+        const v1Index = pathname.indexOf("/v1/");
+        if (v1Index !== -1) {
+            // URL has an existing /v1/* path - replace it with the desired endpoint
+            url.pathname = pathname.substring(0, v1Index) + normalizedEndpoint;
+            return url.toString().replace(/\/+$/, "");
         }
+        // No /v1/ path found, append the endpoint
+        url.pathname = pathname + normalizedEndpoint;
+        return url.toString().replace(/\/+$/, "");
     }
     catch {
-        // If URL parsing fails, fall back to simple string check
+        // If URL parsing fails, fall back to simple string manipulation
         if (normalizedBase.includes(normalizedEndpoint)) {
             return normalizedBase;
         }
+        // Check for existing /v1/ path and strip it
+        const v1Index = normalizedBase.indexOf("/v1/");
+        if (v1Index !== -1) {
+            return normalizedBase.substring(0, v1Index) + normalizedEndpoint;
+        }
+        return `${normalizedBase}${normalizedEndpoint}`;
     }
-    // Append the endpoint path
-    return `${normalizedBase}${normalizedEndpoint}`;
 }
 /**
  * Creates a configurable Heroku AI provider for the Vercel AI SDK.
@@ -122,11 +135,17 @@ function createHerokuAI(options = {}) {
     const imageApiKey = options.imageApiKey ??
         getEnvVar("DIFFUSION_KEY") ??
         getEnvVar("HEROKU_DIFFUSION_KEY");
+    // Reranking uses the same INFERENCE_* env vars as chat since Heroku provisions
+    // rerank models under the inference service (not separate RERANKING_* vars)
+    const rerankingApiKey = options.rerankingApiKey ??
+        getEnvVar("INFERENCE_KEY") ??
+        getEnvVar("HEROKU_INFERENCE_KEY");
     // Get base URLs from options or environment, then ensure proper endpoint paths
     // Environment variables typically only provide the domain without the API path
     const CHAT_ENDPOINT = "/v1/chat/completions";
     const EMBEDDINGS_ENDPOINT = "/v1/embeddings";
     const IMAGE_ENDPOINT = "/v1/images/generations";
+    const RERANKING_ENDPOINT = "/v1/rerank";
     const DEFAULT_BASE_URL = "https://us.inference.heroku.com";
     const rawChatBaseUrl = options.chatBaseUrl ??
         getEnvVar("INFERENCE_URL") ??
@@ -145,9 +164,15 @@ function createHerokuAI(options = {}) {
         getEnvVar("HEROKU_IMAGES_URL") ??
         DEFAULT_BASE_URL;
     const imageBaseUrl = ensureEndpointPath(rawImageBaseUrl, IMAGE_ENDPOINT);
+    // Reranking uses the same INFERENCE_* env vars as chat
+    const rawRerankingBaseUrl = options.rerankingBaseUrl ??
+        getEnvVar("INFERENCE_URL") ??
+        getEnvVar("HEROKU_INFERENCE_URL") ??
+        DEFAULT_BASE_URL;
+    const rerankingBaseUrl = ensureEndpointPath(rawRerankingBaseUrl, RERANKING_ENDPOINT);
     // Validate that at least one API key is provided
-    if (!chatApiKey && !embeddingsApiKey && !imageApiKey) {
-        throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.", "apiKeys", "[REDACTED]");
+    if (!chatApiKey && !embeddingsApiKey && !imageApiKey && !rerankingApiKey) {
+        throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, or DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey / rerankingApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.", "apiKeys", "[REDACTED]");
     }
     // Validate provided URLs if they exist
     if (options.chatBaseUrl) {
@@ -158,6 +183,9 @@ function createHerokuAI(options = {}) {
     }
     if (options.imageBaseUrl) {
         validateUrl(options.imageBaseUrl, "imageBaseUrl");
+    }
+    if (options.rerankingBaseUrl) {
+        validateUrl(options.rerankingBaseUrl, "rerankingBaseUrl");
     }
     return {
         /**
@@ -237,6 +265,32 @@ function createHerokuAI(options = {}) {
             validateImageModel(model);
             return new image_js_1.HerokuImageModel(model, imageApiKey, imageBaseUrl);
         },
+        /**
+         * Creates a reranking model instance for the specified Heroku model.
+         *
+         * @param model - The Heroku reranking model identifier
+         * @returns A HerokuRerankingModel instance compatible with AI SDK v6
+         *
+         * @throws {ValidationError} When the reranking API key is missing or the model identifier is invalid
+         *
+         * @example
+         * ```typescript
+         * const rerankingModel = heroku.reranking("cohere-rerank-3-5");
+         *
+         * const { ranking } = await rerank({
+         *   model: rerankingModel,
+         *   query: "How do I optimize database queries?",
+         *   documents: ["Use indexes", "Enable caching", "Monitor queries"]
+         * });
+         * ```
+         */
+        reranking: (model) => {
+            if (!rerankingApiKey) {
+                throw (0, error_handling_js_1.createValidationError)("Reranking API key is required. Set INFERENCE_KEY environment variable or provide rerankingApiKey in options. Note: Heroku provisions rerank models under the inference service. In browser environments, you must provide rerankingApiKey in options.", "rerankingApiKey", "[REDACTED]");
+            }
+            validateRerankingModel(model);
+            return new reranking_js_1.HerokuRerankingModel(model, rerankingApiKey, rerankingBaseUrl);
+        },
     };
 }
 /**
@@ -300,6 +354,21 @@ function validateImageModel(model) {
     }
 }
 /**
+ * Validate reranking model identifier for Heroku reranking.
+ * @internal
+ */
+function validateRerankingModel(model) {
+    if (!model || typeof model !== "string") {
+        throw (0, error_handling_js_1.createValidationError)("Model must be a non-empty string", "model", model);
+    }
+    if (model.trim().length === 0) {
+        throw (0, error_handling_js_1.createValidationError)("Model cannot be empty or whitespace", "model", model);
+    }
+    if (!(0, supported_models_js_1.isSupportedRerankingModel)(model)) {
+        throw (0, error_handling_js_1.createValidationError)(`Unsupported reranking model '${model}'. Supported models: ${(0, supported_models_js_1.getSupportedRerankingModelsString)()}`, "model", model);
+    }
+}
+/**
  * Default Heroku AI provider instance that lazily reads credentials from environment variables.
  *
  * This proxy defers calling {@link createHerokuAI} until the first property access,
@@ -326,6 +395,8 @@ Object.defineProperty(exports, "HerokuEmbeddingModel", { enumerable: true, get: 
 Object.defineProperty(exports, "createEmbedFunction", { enumerable: true, get: function () { return embedding_js_2.createEmbedFunction; } });
 var image_js_2 = require('./models/image.cjs');
 Object.defineProperty(exports, "HerokuImageModel", { enumerable: true, get: function () { return image_js_2.HerokuImageModel; } });
+var reranking_js_2 = require('./models/reranking.cjs');
+Object.defineProperty(exports, "HerokuRerankingModel", { enumerable: true, get: function () { return reranking_js_2.HerokuRerankingModel; } });
 // Export error handling utilities
 var user_friendly_errors_js_1 = require('./utils/user-friendly-errors.cjs');
 Object.defineProperty(exports, "createUserFriendlyError", { enumerable: true, get: function () { return user_friendly_errors_js_1.createUserFriendlyError; } });
@@ -344,11 +415,14 @@ var supported_models_js_2 = require('./utils/supported-models.cjs');
 Object.defineProperty(exports, "SUPPORTED_CHAT_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_CHAT_MODELS; } });
 Object.defineProperty(exports, "SUPPORTED_EMBEDDING_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_EMBEDDING_MODELS; } });
 Object.defineProperty(exports, "SUPPORTED_IMAGE_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_IMAGE_MODELS; } });
+Object.defineProperty(exports, "SUPPORTED_RERANKING_MODELS", { enumerable: true, get: function () { return supported_models_js_2.SUPPORTED_RERANKING_MODELS; } });
 Object.defineProperty(exports, "fetchAvailableModels", { enumerable: true, get: function () { return supported_models_js_2.fetchAvailableModels; } });
 Object.defineProperty(exports, "getSupportedChatModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedChatModels; } });
 Object.defineProperty(exports, "getSupportedEmbeddingModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedEmbeddingModels; } });
 Object.defineProperty(exports, "getSupportedImageModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedImageModels; } });
+Object.defineProperty(exports, "getSupportedRerankingModels", { enumerable: true, get: function () { return supported_models_js_2.getSupportedRerankingModels; } });
 Object.defineProperty(exports, "isSupportedChatModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedChatModel; } });
 Object.defineProperty(exports, "isSupportedEmbeddingModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedEmbeddingModel; } });
 Object.defineProperty(exports, "isSupportedImageModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedImageModel; } });
+Object.defineProperty(exports, "isSupportedRerankingModel", { enumerable: true, get: function () { return supported_models_js_2.isSupportedRerankingModel; } });
 //# sourceMappingURL=index.js.map
