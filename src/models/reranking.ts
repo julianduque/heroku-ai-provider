@@ -353,9 +353,9 @@ export class HerokuRerankingModel implements RerankingModelV3 {
 
     // Add optional topN parameter
     if (options.topN !== undefined) {
-      if (options.topN < 1) {
+      if (!Number.isInteger(options.topN) || options.topN < 1) {
         throw new APICallError({
-          message: "topN must be at least 1",
+          message: "topN must be a positive integer (at least 1)",
           url: this.baseUrl,
           requestBodyValues: { topN: options.topN },
           statusCode: 400,
@@ -411,11 +411,27 @@ export class HerokuRerankingModel implements RerankingModelV3 {
         });
       }
 
-      // Map response to AI SDK format
-      const ranking = response.results.map((result) => ({
-        index: result.index,
-        relevanceScore: result.relevance_score,
-      }));
+      // Map response to AI SDK format with validation
+      const ranking = response.results.map((result, i) => {
+        if (
+          typeof result.index !== "number" ||
+          !Number.isInteger(result.index) ||
+          result.index < 0 ||
+          result.index >= documentStrings.length
+        ) {
+          throw new APICallError({
+            message: `Invalid document index ${result.index} at position ${i}`,
+            url: this.baseUrl,
+            requestBodyValues: body,
+            statusCode: 500,
+            responseBody: JSON.stringify(response),
+          });
+        }
+        return {
+          index: result.index,
+          relevanceScore: result.relevance_score,
+        };
+      });
 
       return {
         ranking,

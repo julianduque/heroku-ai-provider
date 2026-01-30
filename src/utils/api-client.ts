@@ -150,9 +150,6 @@ async function executeRequest(
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
-    config.abortSignal?.removeEventListener("abort", externalAbortHandler);
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       throw mapHerokuError(response.status, errorData, url, body);
@@ -160,9 +157,6 @@ async function executeRequest(
 
     return config.stream ? response : await response.json();
   } catch (error) {
-    clearTimeout(timeoutId);
-    config.abortSignal?.removeEventListener("abort", externalAbortHandler);
-
     // Handle different types of errors
     if (error instanceof Error) {
       if (error.name === "AbortError") {
@@ -189,6 +183,9 @@ async function executeRequest(
 
     // Re-throw API errors as-is
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    config.abortSignal?.removeEventListener("abort", externalAbortHandler);
   }
 }
 

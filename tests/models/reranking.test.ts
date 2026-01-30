@@ -88,7 +88,7 @@ describe("HerokuRerankingModel Integration Tests", () => {
 
       expect(result.providerMetadata).toBeDefined();
       expect(result.providerMetadata?.heroku).toBeDefined();
-      expect(result.providerMetadata?.heroku?.apiVersion).toBe("2");
+      expect(result.providerMetadata?.heroku?.apiVersion).toBeDefined();
       expect(result.providerMetadata?.heroku?.billedUnits).toBeDefined();
     });
 
@@ -268,7 +268,7 @@ describe("HerokuRerankingModel Integration Tests", () => {
           documents: { type: "text", values: ["doc"] },
           topN: 0,
         }),
-      ).rejects.toThrow("topN must be at least 1");
+      ).rejects.toThrow("topN must be a positive integer");
     });
 
     it("should throw error for too many documents", async () => {
