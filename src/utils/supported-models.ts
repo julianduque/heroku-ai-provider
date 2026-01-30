@@ -24,7 +24,8 @@ export interface HerokuModelInfo {
 export type HerokuModelType =
   | "text-to-text"
   | "text-to-embedding"
-  | "text-to-image";
+  | "text-to-image"
+  | "text-to-ranking";
 
 /**
  * URL for fetching available models from Heroku.
@@ -45,9 +46,17 @@ export const SUPPORTED_CHAT_MODELS: readonly string[] = Object.freeze([
   "claude-4-5-haiku",
   "claude-4-5-sonnet",
   "claude-4-sonnet",
+  "claude-opus-4-5",
   "gpt-oss-120b",
+  "kimi-k2-thinking",
+  "minimax-m2",
+  "nova-2-lite",
+  "nova-2-omni",
+  "nova-2-pro",
   "nova-lite",
   "nova-pro",
+  "qwen3-235b",
+  "qwen3-coder-480b",
 ]);
 
 /**
@@ -62,6 +71,14 @@ export const SUPPORTED_EMBEDDING_MODELS: readonly string[] = Object.freeze([
  */
 export const SUPPORTED_IMAGE_MODELS: readonly string[] = Object.freeze([
   "stable-image-ultra",
+]);
+
+/**
+ * Static fallback list of supported reranking models (text-to-ranking).
+ */
+export const SUPPORTED_RERANKING_MODELS: readonly string[] = Object.freeze([
+  "cohere-rerank-3-5",
+  "amazon-rerank-1-0",
 ]);
 
 /**
@@ -225,6 +242,32 @@ export async function getSupportedImageModels(options?: {
 }
 
 /**
+ * Gets the list of supported reranking models, attempting to fetch from API first.
+ *
+ * @param options - Options for fetching
+ * @returns Array of supported reranking model IDs
+ */
+export async function getSupportedRerankingModels(options?: {
+  timeout?: number;
+  useCache?: boolean;
+}): Promise<string[]> {
+  const models = await fetchAvailableModels(options);
+
+  if (models) {
+    const rerankingModels = models
+      .filter((m) => m.type.includes("text-to-ranking"))
+      .map((m) => m.model_id);
+
+    if (rerankingModels.length > 0) {
+      return rerankingModels;
+    }
+  }
+
+  // Fallback to static list
+  return [...SUPPORTED_RERANKING_MODELS];
+}
+
+/**
  * Synchronously checks if a model is a supported chat model.
  * Uses the static fallback list for immediate validation.
  *
@@ -265,6 +308,17 @@ export function isSupportedImageModel(model: string): boolean {
 }
 
 /**
+ * Synchronously checks if a model is a supported reranking model.
+ * Uses the static fallback list for immediate validation.
+ *
+ * @param model - Model ID to validate
+ * @returns true if the model is supported
+ */
+export function isSupportedRerankingModel(model: string): boolean {
+  return SUPPORTED_RERANKING_MODELS.includes(model);
+}
+
+/**
  * Gets a formatted string of supported chat models for error messages.
  *
  * @returns Comma-separated list of supported models
@@ -289,6 +343,15 @@ export function getSupportedEmbeddingModelsString(): string {
  */
 export function getSupportedImageModelsString(): string {
   return SUPPORTED_IMAGE_MODELS.join(", ");
+}
+
+/**
+ * Gets a formatted string of supported reranking models for error messages.
+ *
+ * @returns Comma-separated list of supported models
+ */
+export function getSupportedRerankingModelsString(): string {
+  return SUPPORTED_RERANKING_MODELS.join(", ");
 }
 
 /**

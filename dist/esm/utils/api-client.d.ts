@@ -21,6 +21,8 @@ export interface RequestOptions {
     stream?: boolean;
     /** Additional headers to include */
     headers?: Record<string, string>;
+    /** Optional AbortSignal for request cancellation */
+    abortSignal?: AbortSignal;
 }
 /**
  * Enhanced Heroku API client with comprehensive error handling and retry logic

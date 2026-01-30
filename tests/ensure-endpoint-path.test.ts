@@ -4,6 +4,7 @@ describe("ensureEndpointPath", () => {
   const CHAT_ENDPOINT = "/v1/chat/completions";
   const EMBEDDINGS_ENDPOINT = "/v1/embeddings";
   const IMAGE_ENDPOINT = "/v1/images/generations";
+  const RERANKING_ENDPOINT = "/v1/rerank";
 
   describe("chat endpoint", () => {
     it("should append path to base domain only", () => {
@@ -230,6 +231,81 @@ describe("ensureEndpointPath", () => {
       expect(result).toBe(
         "https://us.inference.heroku.com/v1/chat/completions",
       );
+    });
+  });
+
+  describe("reranking endpoint", () => {
+    it("should append path to base domain only", () => {
+      expect(
+        ensureEndpointPath(
+          "https://us.inference.heroku.com",
+          RERANKING_ENDPOINT,
+        ),
+      ).toBe("https://us.inference.heroku.com/v1/rerank");
+    });
+
+    it("should NOT double the path if already present", () => {
+      expect(
+        ensureEndpointPath(
+          "https://us.inference.heroku.com/v1/rerank",
+          RERANKING_ENDPOINT,
+        ),
+      ).toBe("https://us.inference.heroku.com/v1/rerank");
+    });
+  });
+
+  describe("cross-endpoint replacement", () => {
+    it("should replace chat endpoint with reranking endpoint", () => {
+      // When INFERENCE_URL is a full chat endpoint but we need reranking
+      const result = ensureEndpointPath(
+        "https://us.inference.heroku.com/v1/chat/completions",
+        RERANKING_ENDPOINT,
+      );
+      expect(result).toBe("https://us.inference.heroku.com/v1/rerank");
+    });
+
+    it("should replace embeddings endpoint with reranking endpoint", () => {
+      const result = ensureEndpointPath(
+        "https://us.inference.heroku.com/v1/embeddings",
+        RERANKING_ENDPOINT,
+      );
+      expect(result).toBe("https://us.inference.heroku.com/v1/rerank");
+    });
+
+    it("should replace image endpoint with chat endpoint", () => {
+      const result = ensureEndpointPath(
+        "https://us.inference.heroku.com/v1/images/generations",
+        CHAT_ENDPOINT,
+      );
+      expect(result).toBe(
+        "https://us.inference.heroku.com/v1/chat/completions",
+      );
+    });
+
+    it("should replace chat endpoint with embeddings endpoint", () => {
+      const result = ensureEndpointPath(
+        "https://us.inference.heroku.com/v1/chat/completions",
+        EMBEDDINGS_ENDPOINT,
+      );
+      expect(result).toBe("https://us.inference.heroku.com/v1/embeddings");
+    });
+
+    it("should handle cross-endpoint replacement with custom domain prefix", () => {
+      const result = ensureEndpointPath(
+        "https://api.example.com/heroku/v1/chat/completions",
+        RERANKING_ENDPOINT,
+      );
+      expect(result).toBe("https://api.example.com/heroku/v1/rerank");
+    });
+
+    it("should NOT create invalid double path when replacing endpoints", () => {
+      // This was the original bug - appending /v1/rerank to /v1/chat/completions
+      const result = ensureEndpointPath(
+        "https://us.inference.heroku.com/v1/chat/completions",
+        RERANKING_ENDPOINT,
+      );
+      expect(result).not.toContain("/v1/chat/completions/v1/rerank");
+      expect(result).toBe("https://us.inference.heroku.com/v1/rerank");
     });
   });
 });

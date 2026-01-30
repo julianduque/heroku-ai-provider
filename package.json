@@ -47,12 +47,13 @@
     "ai-sdk",
     "llm",
     "chat",
-    "embeddings"
+    "embeddings",
+    "reranking"
   ],
   "packageManager": "pnpm@10.12.1",
   "dependencies": {
-    "@ai-sdk/provider": "^2.0.0",
-    "@ai-sdk/provider-utils": "^3.0.18"
+    "@ai-sdk/provider": "^3.0.0",
+    "@ai-sdk/provider-utils": "^4.0.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
@@ -61,7 +62,7 @@
     "@eslint/markdown": "^7.5.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.10.2",
-    "ai": "^5.0.108",
+    "ai": "^6.0.0",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
