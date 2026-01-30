@@ -73,7 +73,9 @@ async function ragRerankingExample() {
     ];
 
     console.log(`User Question: "${userQuestion}"\n`);
-    console.log(`Retrieved ${retrievedDocuments.length} candidates from vector search\n`);
+    console.log(
+      `Retrieved ${retrievedDocuments.length} candidates from vector search\n`,
+    );
 
     // Rerank to find the most relevant documents for the user's question
     const { ranking } = await rerank({
@@ -91,8 +93,12 @@ async function ragRerankingExample() {
       return retrievedDocuments[item.originalIndex];
     });
 
-    console.log("\nThese documents can now be used as context for an LLM response.");
-    console.log(`Context tokens saved by filtering: ${retrievedDocuments.length - contextDocuments.length} documents excluded`);
+    console.log(
+      "\nThese documents can now be used as context for an LLM response.",
+    );
+    console.log(
+      `Context tokens saved by filtering: ${retrievedDocuments.length - contextDocuments.length} documents excluded`,
+    );
   } catch (error) {
     console.error("Error in RAG reranking example:", error);
   }
@@ -141,7 +147,9 @@ async function directModelUsageExample() {
 
     if (result.providerMetadata?.heroku) {
       console.log("\nProvider Metadata:");
-      console.log(`  API Version: ${result.providerMetadata.heroku.apiVersion}`);
+      console.log(
+        `  API Version: ${result.providerMetadata.heroku.apiVersion}`,
+      );
       console.log(
         `  Billed Units: ${JSON.stringify(result.providerMetadata.heroku.billedUnits)}`,
       );
@@ -161,10 +169,26 @@ async function objectDocumentsExample() {
 
     // When documents are structured objects (e.g., from a database)
     const emailResults = [
-      { from: "Paul Doe", subject: "Follow-up", text: "20% discount on your next order." },
-      { from: "John McGill", subject: "Pricing Info", text: "Oracle pricing: $5000/month" },
-      { from: "Sarah Smith", subject: "Meeting Notes", text: "Discussed Q4 projections." },
-      { from: "Tech Support", subject: "Re: Database Issue", text: "The Oracle connection pool was exhausted." },
+      {
+        from: "Paul Doe",
+        subject: "Follow-up",
+        text: "20% discount on your next order.",
+      },
+      {
+        from: "John McGill",
+        subject: "Pricing Info",
+        text: "Oracle pricing: $5000/month",
+      },
+      {
+        from: "Sarah Smith",
+        subject: "Meeting Notes",
+        text: "Discussed Q4 projections.",
+      },
+      {
+        from: "Tech Support",
+        subject: "Re: Database Issue",
+        text: "The Oracle connection pool was exhausted.",
+      },
     ];
 
     console.log("Searching structured email objects...\n");
@@ -256,7 +280,9 @@ async function modelComparisonExample() {
       documents,
     });
     cohereResult.ranking.forEach((item, i) => {
-      console.log(`  ${i + 1}. [${item.originalIndex}] ${item.score.toFixed(4)} - ${documents[item.originalIndex].substring(0, 40)}...`);
+      console.log(
+        `  ${i + 1}. [${item.originalIndex}] ${item.score.toFixed(4)} - ${documents[item.originalIndex].substring(0, 40)}...`,
+      );
     });
 
     // Compare Amazon model (if available)
@@ -268,7 +294,9 @@ async function modelComparisonExample() {
         documents,
       });
       amazonResult.ranking.forEach((item, i) => {
-        console.log(`  ${i + 1}. [${item.originalIndex}] ${item.score.toFixed(4)} - ${documents[item.originalIndex].substring(0, 40)}...`);
+        console.log(
+          `  ${i + 1}. [${item.originalIndex}] ${item.score.toFixed(4)} - ${documents[item.originalIndex].substring(0, 40)}...`,
+        );
       });
     } catch {
       console.log("  (Amazon model not available with current credentials)");
