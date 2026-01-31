@@ -35,6 +35,8 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   /** Optional AbortSignal for request cancellation */
   abortSignal?: AbortSignal;
+  /** Authentication mode: 'bearer' for Authorization header, 'x-api-key' for Anthropic-style */
+  authMode?: "bearer" | "x-api-key";
 }
 
 /**
@@ -48,6 +50,7 @@ const DEFAULT_OPTIONS: Required<Omit<RequestOptions, "abortSignal">> & {
   stream: false,
   headers: {},
   abortSignal: undefined,
+  authMode: "bearer",
 };
 
 /**
@@ -118,7 +121,9 @@ async function executeRequest(
   attempt: number,
 ): Promise<unknown> {
   const headers = {
-    Authorization: `Bearer ${apiKey}`,
+    ...(config.authMode === "x-api-key"
+      ? { "x-api-key": apiKey }
+      : { Authorization: `Bearer ${apiKey}` }),
     "Content-Type": "application/json",
     "X-Request-Attempt": attempt.toString(),
     ...config.headers,
@@ -381,4 +386,187 @@ export function getRetryAfterDelay(error: ErrorWithStatusCode): number | null {
   }
 
   return null;
+}
+
+/**
+ * Anthropic SSE stream event types
+ */
+export interface AnthropicStreamEvent {
+  type:
+    | "message_start"
+    | "content_block_start"
+    | "content_block_delta"
+    | "content_block_stop"
+    | "message_delta"
+    | "message_stop"
+    | "ping"
+    | "error";
+  index?: number;
+  message?: Record<string, unknown>;
+  content_block?: Record<string, unknown>;
+  delta?: Record<string, unknown>;
+  usage?: Record<string, unknown>;
+  error?: Record<string, unknown>;
+}
+
+/**
+ * Enhanced SSE stream handling for Anthropic Messages API
+ * Anthropic uses a different SSE format with event: and data: lines
+ */
+export function processAnthropicStream(
+  response: Response,
+  url = "",
+): ReadableStream<AnthropicStreamEvent> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          let currentEventType: string | null = null;
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) {
+              currentEventType = null;
+              continue;
+            }
+
+            // Parse event type line
+            if (trimmedLine.startsWith("event:")) {
+              currentEventType = trimmedLine.slice(6).trim();
+              continue;
+            }
+
+            // Parse data line
+            if (trimmedLine.startsWith("data:")) {
+              const data = trimmedLine.slice(5).trim();
+
+              // Skip empty data or [DONE] marker (from Heroku proxy)
+              if (!data || data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data) as Record<string, unknown>;
+
+                // Use the event type from the parsed data, or fall back to the SSE event type
+                const eventType =
+                  (parsed.type as string) || currentEventType || "unknown";
+
+                const event: AnthropicStreamEvent = {
+                  type: eventType as AnthropicStreamEvent["type"],
+                  ...parsed,
+                };
+
+                controller.enqueue(event);
+              } catch (parseError) {
+                console.warn(
+                  "Error parsing Anthropic SSE data:",
+                  parseError,
+                  "Data:",
+                  data,
+                );
+
+                controller.enqueue({
+                  type: "error",
+                  error: {
+                    type: "parse_error",
+                    message: "Failed to parse streaming response",
+                    data: data,
+                  },
+                });
+              }
+
+              currentEventType = null;
+            }
+          }
+        }
+
+        // Process any remaining data in the buffer
+        if (buffer.trim()) {
+          const lines = buffer.split("\n");
+          let currentEventType: string | null = null;
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            if (trimmedLine.startsWith("event:")) {
+              currentEventType = trimmedLine.slice(6).trim();
+              continue;
+            }
+
+            if (trimmedLine.startsWith("data:")) {
+              const data = trimmedLine.slice(5).trim();
+              if (data) {
+                try {
+                  const parsed = JSON.parse(data) as Record<string, unknown>;
+                  const eventType =
+                    (parsed.type as string) || currentEventType || "unknown";
+
+                  const event: AnthropicStreamEvent = {
+                    type: eventType as AnthropicStreamEvent["type"],
+                    ...parsed,
+                  };
+
+                  controller.enqueue(event);
+                } catch (parseError) {
+                  console.warn(
+                    "Error parsing final Anthropic SSE data:",
+                    parseError,
+                    "Data:",
+                    data,
+                  );
+                }
+              }
+            }
+          }
+        }
+
+        controller.close();
+      } catch (streamError) {
+        const mappedError = mapStreamError(streamError as Error, url);
+        controller.error(mappedError);
+      }
+    },
+  });
+}
+
+/**
+ * Create a streaming request for Anthropic Messages API
+ */
+export async function makeAnthropicStreamRequest(
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  options: RequestOptions = {},
+): Promise<ReadableStream<AnthropicStreamEvent>> {
+  const streamOptions = {
+    ...options,
+    stream: true,
+    authMode: "x-api-key" as const,
+  };
+
+  try {
+    const response = (await makeHerokuRequest(
+      url,
+      apiKey,
+      body,
+      streamOptions,
+    )) as Response;
+    return processAnthropicStream(response, url);
+  } catch (error) {
+    if (error instanceof Error && !("statusCode" in error)) {
+      throw mapStreamError(error, url);
+    }
+    throw error;
+  }
 }

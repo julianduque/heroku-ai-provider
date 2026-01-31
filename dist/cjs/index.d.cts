@@ -2,6 +2,7 @@ import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
 import { HerokuImageModel } from "./models/image.js";
 import { HerokuRerankingModel } from "./models/reranking.js";
+import { HerokuAnthropicModel } from "./models/anthropic.js";
 /**
  * Ensures the base URL has the correct API endpoint path appended.
  * The environment variables typically only provide the domain (e.g., https://us.inference.heroku.com)
@@ -74,6 +75,18 @@ export interface HerokuAIOptions {
      * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/rerank" (process.env only available in Node.js)
      */
     rerankingBaseUrl?: string;
+    /**
+     * API key for Anthropic Messages API.
+     * Falls back to INFERENCE_KEY since Heroku provisions Claude models under the inference service.
+     * @default process.env.INFERENCE_KEY ?? process.env.HEROKU_INFERENCE_KEY (Node.js only; not available in browsers)
+     */
+    anthropicApiKey?: string;
+    /**
+     * Base URL for Anthropic Messages API.
+     * Falls back to INFERENCE_URL with /v1/messages endpoint.
+     * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/messages" (process.env only available in Node.js)
+     */
+    anthropicBaseUrl?: string;
 }
 /**
  * @deprecated Use {@link HerokuAIOptions} instead.
@@ -194,6 +207,43 @@ export declare function createHerokuAI(options?: HerokuAIOptions): {
      * ```
      */
     reranking: (model: string) => HerokuRerankingModel;
+    /**
+     * Creates an Anthropic language model instance using the native Messages API.
+     *
+     * This provides access to Anthropic-specific features like extended thinking,
+     * prompt caching, and native tool use format through Heroku's managed infrastructure.
+     *
+     * @param model - The Anthropic model identifier (Claude models only)
+     * @returns A HerokuAnthropicModel instance compatible with AI SDK v5
+     *
+     * @throws {ValidationError} When the API key is missing or the model is not a supported Anthropic model
+     *
+     * @example
+     * Basic usage:
+     * ```typescript
+     * const anthropicModel = heroku.anthropic("claude-4-sonnet");
+     *
+     * const { text } = await generateText({
+     *   model: anthropicModel,
+     *   prompt: "Explain quantum computing"
+     * });
+     * ```
+     *
+     * @example
+     * With extended thinking (Claude 3.7+):
+     * ```typescript
+     * const { text } = await generateText({
+     *   model: heroku.anthropic("claude-3-7-sonnet"),
+     *   prompt: "Solve this complex problem...",
+     *   providerOptions: {
+     *     anthropic: {
+     *       thinking: { type: "enabled", budgetTokens: 10000 }
+     *     }
+     *   }
+     * });
+     * ```
+     */
+    anthropic: (model: string) => HerokuAnthropicModel;
 };
 export declare const heroku: {
     /**
@@ -273,6 +323,43 @@ export declare const heroku: {
      * ```
      */
     reranking: (model: string) => HerokuRerankingModel;
+    /**
+     * Creates an Anthropic language model instance using the native Messages API.
+     *
+     * This provides access to Anthropic-specific features like extended thinking,
+     * prompt caching, and native tool use format through Heroku's managed infrastructure.
+     *
+     * @param model - The Anthropic model identifier (Claude models only)
+     * @returns A HerokuAnthropicModel instance compatible with AI SDK v5
+     *
+     * @throws {ValidationError} When the API key is missing or the model is not a supported Anthropic model
+     *
+     * @example
+     * Basic usage:
+     * ```typescript
+     * const anthropicModel = heroku.anthropic("claude-4-sonnet");
+     *
+     * const { text } = await generateText({
+     *   model: anthropicModel,
+     *   prompt: "Explain quantum computing"
+     * });
+     * ```
+     *
+     * @example
+     * With extended thinking (Claude 3.7+):
+     * ```typescript
+     * const { text } = await generateText({
+     *   model: heroku.anthropic("claude-3-7-sonnet"),
+     *   prompt: "Solve this complex problem...",
+     *   providerOptions: {
+     *     anthropic: {
+     *       thinking: { type: "enabled", budgetTokens: 10000 }
+     *     }
+     *   }
+     * });
+     * ```
+     */
+    anthropic: (model: string) => HerokuAnthropicModel;
 };
 /**
  * @deprecated Use {@link createHerokuAI} instead.
@@ -282,8 +369,9 @@ export { HerokuChatLanguageModel } from "./models/chat.js";
 export { HerokuEmbeddingModel, createEmbedFunction, } from "./models/embedding.js";
 export { HerokuImageModel } from "./models/image.js";
 export { HerokuRerankingModel } from "./models/reranking.js";
+export { HerokuAnthropicModel } from "./models/anthropic.js";
 export type { EmbeddingOptions } from "./models/embedding.js";
 export { createUserFriendlyError, formatUserFriendlyError, createSimpleErrorMessage, createDetailedErrorReport, isConfigurationError, isTemporaryServiceError, getContextualHelp, type UserFriendlyError, } from "./utils/user-friendly-errors.js";
 export { HerokuErrorType, ErrorSeverity, ErrorCategory, type HerokuErrorResponse, type ErrorMetadata, } from "./utils/error-types.js";
-export { SUPPORTED_CHAT_MODELS, SUPPORTED_EMBEDDING_MODELS, SUPPORTED_IMAGE_MODELS, SUPPORTED_RERANKING_MODELS, fetchAvailableModels, getSupportedChatModels, getSupportedEmbeddingModels, getSupportedImageModels, getSupportedRerankingModels, isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, isSupportedRerankingModel, type HerokuModelInfo, type HerokuModelType, } from "./utils/supported-models.js";
+export { SUPPORTED_CHAT_MODELS, SUPPORTED_EMBEDDING_MODELS, SUPPORTED_IMAGE_MODELS, SUPPORTED_RERANKING_MODELS, SUPPORTED_ANTHROPIC_MODELS, fetchAvailableModels, getSupportedChatModels, getSupportedEmbeddingModels, getSupportedImageModels, getSupportedRerankingModels, isSupportedChatModel, isSupportedEmbeddingModel, isSupportedImageModel, isSupportedRerankingModel, isSupportedAnthropicModel, getSupportedAnthropicModelsString, type HerokuModelInfo, type HerokuModelType, } from "./utils/supported-models.js";
 //# sourceMappingURL=index.d.ts.map
