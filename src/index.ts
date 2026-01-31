@@ -2,16 +2,19 @@ import { HerokuChatLanguageModel } from "./models/chat.js";
 import { HerokuEmbeddingModel } from "./models/embedding.js";
 import { HerokuImageModel } from "./models/image.js";
 import { HerokuRerankingModel } from "./models/reranking.js";
+import { HerokuAnthropicModel } from "./models/anthropic.js";
 import { createValidationError } from "./utils/error-handling.js";
 import {
   isSupportedChatModel,
   isSupportedEmbeddingModel,
   isSupportedImageModel,
   isSupportedRerankingModel,
+  isSupportedAnthropicModel,
   getSupportedChatModelsString,
   getSupportedEmbeddingModelsString,
   getSupportedImageModelsString,
   getSupportedRerankingModelsString,
+  getSupportedAnthropicModelsString,
 } from "./utils/supported-models.js";
 
 /**
@@ -169,6 +172,20 @@ export interface HerokuAIOptions {
    * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/rerank" (process.env only available in Node.js)
    */
   rerankingBaseUrl?: string;
+
+  /**
+   * API key for Anthropic Messages API.
+   * Falls back to INFERENCE_KEY since Heroku provisions Claude models under the inference service.
+   * @default process.env.INFERENCE_KEY ?? process.env.HEROKU_INFERENCE_KEY (Node.js only; not available in browsers)
+   */
+  anthropicApiKey?: string;
+
+  /**
+   * Base URL for Anthropic Messages API.
+   * Falls back to INFERENCE_URL with /v1/messages endpoint.
+   * @default process.env.INFERENCE_URL ?? "https://us.inference.heroku.com/v1/messages" (process.env only available in Node.js)
+   */
+  anthropicBaseUrl?: string;
 }
 
 /**
@@ -248,6 +265,7 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
   const EMBEDDINGS_ENDPOINT = "/v1/embeddings";
   const IMAGE_ENDPOINT = "/v1/images/generations";
   const RERANKING_ENDPOINT = "/v1/rerank";
+  const ANTHROPIC_ENDPOINT = "/v1/messages";
   const DEFAULT_BASE_URL = "https://us.inference.heroku.com";
 
   const rawChatBaseUrl =
@@ -287,10 +305,31 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
     RERANKING_ENDPOINT,
   );
 
+  // Anthropic uses the same INFERENCE_* env vars as chat but with /v1/messages endpoint
+  const anthropicApiKey =
+    options.anthropicApiKey ??
+    getEnvVar("INFERENCE_KEY") ??
+    getEnvVar("HEROKU_INFERENCE_KEY");
+  const rawAnthropicBaseUrl =
+    options.anthropicBaseUrl ??
+    getEnvVar("INFERENCE_URL") ??
+    getEnvVar("HEROKU_INFERENCE_URL") ??
+    DEFAULT_BASE_URL;
+  const anthropicBaseUrl = ensureEndpointPath(
+    rawAnthropicBaseUrl,
+    ANTHROPIC_ENDPOINT,
+  );
+
   // Validate that at least one API key is provided
-  if (!chatApiKey && !embeddingsApiKey && !imageApiKey && !rerankingApiKey) {
+  if (
+    !chatApiKey &&
+    !embeddingsApiKey &&
+    !imageApiKey &&
+    !rerankingApiKey &&
+    !anthropicApiKey
+  ) {
     throw createValidationError(
-      "At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, or DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey / rerankingApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.",
+      "At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, or DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey / rerankingApiKey / anthropicApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.",
       "apiKeys",
       "[REDACTED]",
     );
@@ -308,6 +347,9 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
   }
   if (options.rerankingBaseUrl) {
     validateUrl(options.rerankingBaseUrl, "rerankingBaseUrl");
+  }
+  if (options.anthropicBaseUrl) {
+    validateUrl(options.anthropicBaseUrl, "anthropicBaseUrl");
   }
 
   return {
@@ -444,6 +486,56 @@ export function createHerokuAI(options: HerokuAIOptions = {}) {
       validateRerankingModel(model);
 
       return new HerokuRerankingModel(model, rerankingApiKey, rerankingBaseUrl);
+    },
+
+    /**
+     * Creates an Anthropic language model instance using the native Messages API.
+     *
+     * This provides access to Anthropic-specific features like extended thinking,
+     * prompt caching, and native tool use format through Heroku's managed infrastructure.
+     *
+     * @param model - The Anthropic model identifier (Claude models only)
+     * @returns A HerokuAnthropicModel instance compatible with AI SDK v5
+     *
+     * @throws {ValidationError} When the API key is missing or the model is not a supported Anthropic model
+     *
+     * @example
+     * Basic usage:
+     * ```typescript
+     * const anthropicModel = heroku.anthropic("claude-4-sonnet");
+     *
+     * const { text } = await generateText({
+     *   model: anthropicModel,
+     *   prompt: "Explain quantum computing"
+     * });
+     * ```
+     *
+     * @example
+     * With extended thinking (Claude 3.7+):
+     * ```typescript
+     * const { text } = await generateText({
+     *   model: heroku.anthropic("claude-3-7-sonnet"),
+     *   prompt: "Solve this complex problem...",
+     *   providerOptions: {
+     *     anthropic: {
+     *       thinking: { type: "enabled", budgetTokens: 10000 }
+     *     }
+     *   }
+     * });
+     * ```
+     */
+    anthropic: (model: string) => {
+      if (!anthropicApiKey) {
+        throw createValidationError(
+          "Anthropic API key is required. Set INFERENCE_KEY environment variable or provide anthropicApiKey in options. Note: In browser environments, you must provide anthropicApiKey in options.",
+          "anthropicApiKey",
+          "[REDACTED]",
+        );
+      }
+
+      validateAnthropicModel(model);
+
+      return new HerokuAnthropicModel(model, anthropicApiKey, anthropicBaseUrl);
     },
   };
 }
@@ -587,6 +679,36 @@ function validateRerankingModel(model: string): void {
 }
 
 /**
+ * Validate Anthropic model identifier for Heroku Anthropic Messages API.
+ * @internal
+ */
+function validateAnthropicModel(model: string): void {
+  if (!model || typeof model !== "string") {
+    throw createValidationError(
+      "Model must be a non-empty string",
+      "model",
+      model,
+    );
+  }
+
+  if (model.trim().length === 0) {
+    throw createValidationError(
+      "Model cannot be empty or whitespace",
+      "model",
+      model,
+    );
+  }
+
+  if (!isSupportedAnthropicModel(model)) {
+    throw createValidationError(
+      `Unsupported Anthropic model '${model}'. Supported models: ${getSupportedAnthropicModelsString()}`,
+      "model",
+      model,
+    );
+  }
+}
+
+/**
  * Default Heroku AI provider instance that lazily reads credentials from environment variables.
  *
  * This proxy defers calling {@link createHerokuAI} until the first property access,
@@ -616,6 +738,7 @@ export {
 } from "./models/embedding.js";
 export { HerokuImageModel } from "./models/image.js";
 export { HerokuRerankingModel } from "./models/reranking.js";
+export { HerokuAnthropicModel } from "./models/anthropic.js";
 export type { EmbeddingOptions } from "./models/embedding.js";
 
 // Export error handling utilities
@@ -644,6 +767,7 @@ export {
   SUPPORTED_EMBEDDING_MODELS,
   SUPPORTED_IMAGE_MODELS,
   SUPPORTED_RERANKING_MODELS,
+  SUPPORTED_ANTHROPIC_MODELS,
   fetchAvailableModels,
   getSupportedChatModels,
   getSupportedEmbeddingModels,
@@ -653,6 +777,8 @@ export {
   isSupportedEmbeddingModel,
   isSupportedImageModel,
   isSupportedRerankingModel,
+  isSupportedAnthropicModel,
+  getSupportedAnthropicModelsString,
   type HerokuModelInfo,
   type HerokuModelType,
 } from "./utils/supported-models.js";
