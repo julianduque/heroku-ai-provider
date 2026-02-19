@@ -47,9 +47,16 @@ export const SUPPORTED_CHAT_MODELS: readonly string[] = Object.freeze([
   "claude-4-5-sonnet",
   "claude-4-sonnet",
   "claude-opus-4-5",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "deepseek-v3-2",
+  "glm-4-7",
+  "glm-4-7-flash",
   "gpt-oss-120b",
+  "kimi-k2-5",
   "kimi-k2-thinking",
   "minimax-m2",
+  "minimax-m2-1",
   "nova-2-lite",
   "nova-2-omni",
   "nova-2-pro",
@@ -64,6 +71,7 @@ export const SUPPORTED_CHAT_MODELS: readonly string[] = Object.freeze([
  */
 export const SUPPORTED_EMBEDDING_MODELS: readonly string[] = Object.freeze([
   "cohere-embed-multilingual",
+  "cohere-embed-v4",
 ]);
 
 /**
