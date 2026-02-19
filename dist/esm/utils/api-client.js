@@ -372,7 +372,11 @@ export function processAnthropicStream(response, url = "") {
  * Create a streaming request for Anthropic Messages API
  */
 export async function makeAnthropicStreamRequest(url, apiKey, body, options = {}) {
-    const streamOptions = { ...options, stream: true, authMode: "x-api-key" };
+    const streamOptions = {
+        ...options,
+        stream: true,
+        authMode: "x-api-key",
+    };
     try {
         const response = (await makeHerokuRequest(url, apiKey, body, streamOptions));
         return processAnthropicStream(response, url);

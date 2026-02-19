@@ -479,7 +479,10 @@ class HerokuAnthropicModel {
                             ];
                         }
                         else {
-                            lastMessage.content = [...lastMessage.content, ...toolResultBlocks];
+                            lastMessage.content = [
+                                ...lastMessage.content,
+                                ...toolResultBlocks,
+                            ];
                         }
                     }
                     else {
@@ -676,7 +679,9 @@ class HerokuAnthropicModel {
                 });
             }
             // Clean up schema
-            const inputSchema = schema ? JSON.parse(JSON.stringify(schema)) : { type: "object" };
+            const inputSchema = schema
+                ? JSON.parse(JSON.stringify(schema))
+                : { type: "object" };
             if (inputSchema && typeof inputSchema === "object") {
                 if ("$schema" in inputSchema) {
                     delete inputSchema.$schema;
@@ -816,9 +821,7 @@ class HerokuAnthropicModel {
                 }
                 if (message?.usage) {
                     const usage = message.usage;
-                    const inputTokens = typeof usage.input_tokens === "number"
-                        ? usage.input_tokens
-                        : 0;
+                    const inputTokens = typeof usage.input_tokens === "number" ? usage.input_tokens : 0;
                     this.streamingUsage = {
                         inputTokens,
                         outputTokens: 0,

@@ -9,7 +9,6 @@ import {
   LanguageModelV2FinishReason,
   LanguageModelV2FunctionTool,
   LanguageModelV2Prompt,
-  LanguageModelV3ProviderTool,
   LanguageModelV2StreamPart,
   LanguageModelV2ToolCall,
   LanguageModelV2ToolChoice,
@@ -147,9 +146,9 @@ interface ToolResult {
 /**
  * Tool input types
  */
-export type ToolInput =
-  | LanguageModelV2FunctionTool
-  | LanguageModelV3ProviderTool;
+export type ToolInput = NonNullable<
+  LanguageModelV2CallOptions["tools"]
+>[number];
 
 export type ToolChoiceInput =
   | LanguageModelV2ToolChoice

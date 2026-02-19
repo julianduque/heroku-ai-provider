@@ -182,7 +182,11 @@ function createHerokuAI(options = {}) {
         DEFAULT_BASE_URL;
     const anthropicBaseUrl = ensureEndpointPath(rawAnthropicBaseUrl, ANTHROPIC_ENDPOINT);
     // Validate that at least one API key is provided
-    if (!chatApiKey && !embeddingsApiKey && !imageApiKey && !rerankingApiKey && !anthropicApiKey) {
+    if (!chatApiKey &&
+        !embeddingsApiKey &&
+        !imageApiKey &&
+        !rerankingApiKey &&
+        !anthropicApiKey) {
         throw (0, error_handling_js_1.createValidationError)("At least one API key must be provided. Set INFERENCE_KEY, EMBEDDING_KEY, or DIFFUSION_KEY, or provide chatApiKey / embeddingsApiKey / imageApiKey / rerankingApiKey / anthropicApiKey in options. Note: In browser environments, you must provide API keys via options as environment variables are not available.", "apiKeys", "[REDACTED]");
     }
     // Validate provided URLs if they exist
