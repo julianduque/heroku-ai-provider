@@ -58,6 +58,30 @@ describe("HerokuAnthropicModel", () => {
       }).toThrow(/Model must be a non-empty string/);
     });
 
+    it("throws for whitespace-only model name", () => {
+      expect(() => {
+        new HerokuAnthropicModel("   ", testApiKey, testBaseUrl);
+      }).toThrow(/Model cannot be empty or contain only whitespace/);
+    });
+
+    it("throws for missing base URL", () => {
+      expect(() => {
+        new HerokuAnthropicModel(testModel, testApiKey, "");
+      }).toThrow(/Base URL must be a non-empty string/);
+    });
+
+    it("throws for whitespace-only base URL", () => {
+      expect(() => {
+        new HerokuAnthropicModel(testModel, testApiKey, "   ");
+      }).toThrow(/Base URL cannot be empty or contain only whitespace/);
+    });
+
+    it("throws for non-HTTP protocol base URL", () => {
+      expect(() => {
+        new HerokuAnthropicModel(testModel, testApiKey, "ftp://example.com");
+      }).toThrow(/Base URL must use HTTP or HTTPS protocol/);
+    });
+
     it("throws for invalid base URL", () => {
       expect(() => {
         new HerokuAnthropicModel(testModel, testApiKey, "not-a-url");
@@ -145,6 +169,72 @@ describe("HerokuAnthropicModel", () => {
           messages: [
             { role: "user", content: [{ type: "text", text: "Hello!" }] },
           ],
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it("passes temperature, topP, topK, and stopSequences to the request", async () => {
+      const mockResponse = {
+        id: "msg_123",
+        type: "message",
+        role: "assistant",
+        model: testModel,
+        content: [{ type: "text", text: "ok" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 2 },
+      };
+      mockMakeHerokuRequest.mockResolvedValue(mockResponse);
+
+      const prompt = buildPrompt("hi");
+      await model.doGenerate(
+        createCallOptions(prompt, {
+          temperature: 0.7,
+          topP: 0.9,
+          topK: 40,
+          stopSequences: ["STOP"],
+        }),
+      );
+
+      expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
+        testBaseUrl,
+        testApiKey,
+        expect.objectContaining({
+          temperature: 0.7,
+          top_p: 0.9,
+          top_k: 40,
+          stop_sequences: ["STOP"],
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it("passes anthropic metadata userId to the request", async () => {
+      const mockResponse = {
+        id: "msg_123",
+        type: "message",
+        role: "assistant",
+        model: testModel,
+        content: [{ type: "text", text: "ok" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 5, output_tokens: 2 },
+      };
+      mockMakeHerokuRequest.mockResolvedValue(mockResponse);
+
+      const prompt = buildPrompt("hi");
+      await model.doGenerate(
+        createCallOptions(prompt, {
+          providerOptions: {
+            anthropic: { metadata: { userId: "user-abc" } },
+          },
+        }),
+      );
+
+      expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
+        testBaseUrl,
+        testApiKey,
+        expect.objectContaining({
+          metadata: { user_id: "user-abc" },
         }),
         expect.any(Object),
       );
@@ -455,6 +545,65 @@ describe("HerokuAnthropicModel", () => {
           type: "finish",
           finishReason: "stop",
         }),
+      );
+    });
+
+    it("passes temperature, topP, topK, and stopSequences to the stream request", async () => {
+      const mockResponse = {
+        headers: new Map([["content-type", "text/event-stream"]]),
+        body: new ReadableStream(),
+      };
+      mockMakeHerokuRequest.mockResolvedValue(
+        mockResponse as unknown as Response,
+      );
+
+      const mockReadableStream =
+        new ReadableStream<apiClient.AnthropicStreamEvent>({
+          start(controller) {
+            controller.enqueue({
+              type: "message_start",
+              message: { id: "msg_1", usage: { input_tokens: 2 } },
+            });
+            controller.enqueue({
+              type: "message_delta",
+              delta: { stop_reason: "end_turn" },
+              usage: { output_tokens: 1 },
+            });
+            controller.enqueue({ type: "message_stop" });
+            controller.close();
+          },
+        });
+      mockProcessAnthropicStream.mockReturnValue(mockReadableStream);
+
+      const prompt = buildPrompt("hi");
+      const { stream } = await model.doStream(
+        createCallOptions(prompt, {
+          temperature: 0.5,
+          topP: 0.8,
+          topK: 20,
+          stopSequences: ["END"],
+        }),
+      );
+
+      const parts: LanguageModelV2StreamPart[] = [];
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) parts.push(value);
+      }
+
+      expect(mockMakeHerokuRequest).toHaveBeenCalledWith(
+        testBaseUrl,
+        testApiKey,
+        expect.objectContaining({
+          temperature: 0.5,
+          top_p: 0.8,
+          top_k: 20,
+          stop_sequences: ["END"],
+          stream: true,
+        }),
+        expect.any(Object),
       );
     });
 
