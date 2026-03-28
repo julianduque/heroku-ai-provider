@@ -9,6 +9,7 @@ const DEFAULT_OPTIONS = {
     stream: false,
     headers: {},
     abortSignal: undefined,
+    authMode: "bearer",
 };
 /**
  * Enhanced Heroku API client with comprehensive error handling and retry logic
@@ -58,7 +59,9 @@ export async function makeHerokuRequest(url, apiKey, body, options = {}) {
  */
 async function executeRequest(url, apiKey, body, config, attempt) {
     const headers = {
-        Authorization: `Bearer ${apiKey}`,
+        ...(config.authMode === "x-api-key"
+            ? { "x-api-key": apiKey }
+            : { Authorization: `Bearer ${apiKey}` }),
         "Content-Type": "application/json",
         "X-Request-Attempt": attempt.toString(),
         ...config.headers,
@@ -263,5 +266,122 @@ export function getRetryAfterDelay(error) {
         return isNaN(delay) ? null : delay * 1000; // Convert to milliseconds
     }
     return null;
+}
+/**
+ * Enhanced SSE stream handling for Anthropic Messages API
+ * Anthropic uses a different SSE format with event: and data: lines
+ */
+export function processAnthropicStream(response, url = "") {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    return new ReadableStream({
+        async start(controller) {
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done)
+                        break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() || "";
+                    let currentEventType = null;
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine) {
+                            currentEventType = null;
+                            continue;
+                        }
+                        // Parse event type line
+                        if (trimmedLine.startsWith("event:")) {
+                            currentEventType = trimmedLine.slice(6).trim();
+                            continue;
+                        }
+                        // Parse data line
+                        if (trimmedLine.startsWith("data:")) {
+                            const data = trimmedLine.slice(5).trim();
+                            // Skip empty data or [DONE] marker (from Heroku proxy)
+                            if (!data || data === "[DONE]")
+                                continue;
+                            try {
+                                const parsed = JSON.parse(data);
+                                // Use the event type from the parsed data, or fall back to the SSE event type
+                                const eventType = parsed.type || currentEventType || "unknown";
+                                const event = {
+                                    type: eventType,
+                                    ...parsed,
+                                };
+                                controller.enqueue(event);
+                            }
+                            catch (parseError) {
+                                console.warn("Error parsing Anthropic SSE data:", parseError, "Data:", data);
+                                controller.enqueue({
+                                    type: "error",
+                                    error: {
+                                        type: "parse_error",
+                                        message: "Failed to parse streaming response",
+                                        data: data,
+                                    },
+                                });
+                            }
+                            currentEventType = null;
+                        }
+                    }
+                }
+                // Process any remaining data in the buffer
+                if (buffer.trim()) {
+                    const lines = buffer.split("\n");
+                    let currentEventType = null;
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine)
+                            continue;
+                        if (trimmedLine.startsWith("event:")) {
+                            currentEventType = trimmedLine.slice(6).trim();
+                            continue;
+                        }
+                        if (trimmedLine.startsWith("data:")) {
+                            const data = trimmedLine.slice(5).trim();
+                            if (data) {
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    const eventType = parsed.type || currentEventType || "unknown";
+                                    const event = {
+                                        type: eventType,
+                                        ...parsed,
+                                    };
+                                    controller.enqueue(event);
+                                }
+                                catch (parseError) {
+                                    console.warn("Error parsing final Anthropic SSE data:", parseError, "Data:", data);
+                                }
+                            }
+                        }
+                    }
+                }
+                controller.close();
+            }
+            catch (streamError) {
+                const mappedError = mapStreamError(streamError, url);
+                controller.error(mappedError);
+            }
+        },
+    });
+}
+/**
+ * Create a streaming request for Anthropic Messages API
+ */
+export async function makeAnthropicStreamRequest(url, apiKey, body, options = {}) {
+    const streamOptions = { ...options, stream: true, authMode: "x-api-key" };
+    try {
+        const response = (await makeHerokuRequest(url, apiKey, body, streamOptions));
+        return processAnthropicStream(response, url);
+    }
+    catch (error) {
+        if (error instanceof Error && !("statusCode" in error)) {
+            throw mapStreamError(error, url);
+        }
+        throw error;
+    }
 }
 //# sourceMappingURL=api-client.js.map
