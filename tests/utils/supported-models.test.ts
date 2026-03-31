@@ -35,7 +35,14 @@ describe("Supported Models Module", () => {
       expect(SUPPORTED_CHAT_MODELS).toContain("claude-4-sonnet");
       expect(SUPPORTED_CHAT_MODELS).toContain("claude-4-5-sonnet");
       expect(SUPPORTED_CHAT_MODELS).toContain("claude-3-7-sonnet");
+      expect(SUPPORTED_CHAT_MODELS).toContain("claude-opus-4-6");
+      expect(SUPPORTED_CHAT_MODELS).toContain("claude-sonnet-4-6");
+      expect(SUPPORTED_CHAT_MODELS).toContain("deepseek-v3-2");
+      expect(SUPPORTED_CHAT_MODELS).toContain("glm-4-7");
+      expect(SUPPORTED_CHAT_MODELS).toContain("glm-4-7-flash");
       expect(SUPPORTED_CHAT_MODELS).toContain("gpt-oss-120b");
+      expect(SUPPORTED_CHAT_MODELS).toContain("kimi-k2-5");
+      expect(SUPPORTED_CHAT_MODELS).toContain("minimax-m2-1");
       expect(SUPPORTED_CHAT_MODELS).toContain("nova-lite");
       expect(SUPPORTED_CHAT_MODELS).toContain("nova-pro");
     });
@@ -55,6 +62,10 @@ describe("Supported Models Module", () => {
 
     it("should contain cohere-embed-multilingual", () => {
       expect(SUPPORTED_EMBEDDING_MODELS).toContain("cohere-embed-multilingual");
+    });
+
+    it("should contain cohere-embed-v4", () => {
+      expect(SUPPORTED_EMBEDDING_MODELS).toContain("cohere-embed-v4");
     });
   });
 
