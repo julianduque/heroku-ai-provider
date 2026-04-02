@@ -40,6 +40,11 @@ export declare const SUPPORTED_IMAGE_MODELS: readonly string[];
  */
 export declare const SUPPORTED_RERANKING_MODELS: readonly string[];
 /**
+ * Static fallback list of supported Anthropic models for the Messages API.
+ * This is a subset of chat models that support Anthropic's native Messages API.
+ */
+export declare const SUPPORTED_ANTHROPIC_MODELS: readonly string[];
+/**
  * Fetches the list of available models from Heroku's API.
  *
  * @param options - Fetch options
@@ -146,6 +151,21 @@ export declare function isSupportedImageModel(model: string): boolean;
  */
 export declare function isSupportedRerankingModel(model: string): boolean;
 /**
+ * Synchronously checks if a model is a supported Anthropic model.
+ * Uses the static fallback list for immediate validation.
+ *
+ * @param model - Model ID to validate
+ * @returns true if the model is supported for the Anthropic Messages API
+ *
+ * @example
+ * ```typescript
+ * if (isSupportedAnthropicModel("claude-4-sonnet")) {
+ *   console.log("Model supports Anthropic Messages API");
+ * }
+ * ```
+ */
+export declare function isSupportedAnthropicModel(model: string): boolean;
+/**
  * Gets a formatted string of supported chat models for error messages.
  *
  * @returns Comma-separated list of supported models
@@ -169,6 +189,12 @@ export declare function getSupportedImageModelsString(): string;
  * @returns Comma-separated list of supported models
  */
 export declare function getSupportedRerankingModelsString(): string;
+/**
+ * Gets a formatted string of supported Anthropic models for error messages.
+ *
+ * @returns Comma-separated list of supported Anthropic models
+ */
+export declare function getSupportedAnthropicModelsString(): string;
 /**
  * Clears the cached models (useful for testing).
  * @internal

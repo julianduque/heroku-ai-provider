@@ -10,7 +10,7 @@
  * @module
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SUPPORTED_RERANKING_MODELS = exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = void 0;
+exports.SUPPORTED_ANTHROPIC_MODELS = exports.SUPPORTED_RERANKING_MODELS = exports.SUPPORTED_IMAGE_MODELS = exports.SUPPORTED_EMBEDDING_MODELS = exports.SUPPORTED_CHAT_MODELS = void 0;
 exports.fetchAvailableModels = fetchAvailableModels;
 exports.getSupportedChatModels = getSupportedChatModels;
 exports.getSupportedEmbeddingModels = getSupportedEmbeddingModels;
@@ -20,10 +20,12 @@ exports.isSupportedChatModel = isSupportedChatModel;
 exports.isSupportedEmbeddingModel = isSupportedEmbeddingModel;
 exports.isSupportedImageModel = isSupportedImageModel;
 exports.isSupportedRerankingModel = isSupportedRerankingModel;
+exports.isSupportedAnthropicModel = isSupportedAnthropicModel;
 exports.getSupportedChatModelsString = getSupportedChatModelsString;
 exports.getSupportedEmbeddingModelsString = getSupportedEmbeddingModelsString;
 exports.getSupportedImageModelsString = getSupportedImageModelsString;
 exports.getSupportedRerankingModelsString = getSupportedRerankingModelsString;
+exports.getSupportedAnthropicModelsString = getSupportedAnthropicModelsString;
 exports.clearModelCache = clearModelCache;
 /**
  * URL for fetching available models from Heroku.
@@ -73,6 +75,20 @@ exports.SUPPORTED_IMAGE_MODELS = Object.freeze([
 exports.SUPPORTED_RERANKING_MODELS = Object.freeze([
     "cohere-rerank-3-5",
     "amazon-rerank-1-0",
+]);
+/**
+ * Static fallback list of supported Anthropic models for the Messages API.
+ * This is a subset of chat models that support Anthropic's native Messages API.
+ */
+exports.SUPPORTED_ANTHROPIC_MODELS = Object.freeze([
+    "claude-3-5-haiku",
+    "claude-3-5-sonnet-latest",
+    "claude-3-7-sonnet",
+    "claude-3-haiku",
+    "claude-4-5-haiku",
+    "claude-4-5-sonnet",
+    "claude-4-sonnet",
+    "claude-opus-4-5",
 ]);
 /**
  * Cache for dynamically fetched models with TTL.
@@ -268,6 +284,23 @@ function isSupportedRerankingModel(model) {
     return exports.SUPPORTED_RERANKING_MODELS.includes(model);
 }
 /**
+ * Synchronously checks if a model is a supported Anthropic model.
+ * Uses the static fallback list for immediate validation.
+ *
+ * @param model - Model ID to validate
+ * @returns true if the model is supported for the Anthropic Messages API
+ *
+ * @example
+ * ```typescript
+ * if (isSupportedAnthropicModel("claude-4-sonnet")) {
+ *   console.log("Model supports Anthropic Messages API");
+ * }
+ * ```
+ */
+function isSupportedAnthropicModel(model) {
+    return exports.SUPPORTED_ANTHROPIC_MODELS.includes(model);
+}
+/**
  * Gets a formatted string of supported chat models for error messages.
  *
  * @returns Comma-separated list of supported models
@@ -298,6 +331,14 @@ function getSupportedImageModelsString() {
  */
 function getSupportedRerankingModelsString() {
     return exports.SUPPORTED_RERANKING_MODELS.join(", ");
+}
+/**
+ * Gets a formatted string of supported Anthropic models for error messages.
+ *
+ * @returns Comma-separated list of supported Anthropic models
+ */
+function getSupportedAnthropicModelsString() {
+    return exports.SUPPORTED_ANTHROPIC_MODELS.join(", ");
 }
 /**
  * Clears the cached models (useful for testing).
